@@ -16,139 +16,84 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
-"""
-STDF Record Types
------------------
 
-====== ====== ==== ======  ====================================
-Major  Minor  2007 Record  Type
-====== ====== ==== ======  =================================== Info
-   00     10       FAR     File Attributes Record
-   00     20       ATR     Audit Trail Record
-   00     30  new  VUR     Version Update Record
--------------------------------------------------------------- Per Lot
-   01     10       MIR     Master Information Record
-   01     20       MRR     Master Results Record
-   01     30       PCR     Part Count Record
-   01     40       HBR     Hardware Bin Record
-   01     50       SBR     Software Bin Record
-   01     60       PMR     Pin Map Record
-   01     62       PGR     Pin Group Record
-   01     63       PLR     Pin List Record
-   01     70       RDR     Retest Data Record
-   01     80       SDR     Site Description Record
-   01     90  new  PSR     Pattern Sequence Record
-   01     91  new  NMR     Name Map Record
-   01     92  new  CNR     Cell Name Record
-   01     93  new  SSR     Scan Structure Record
-   01     94  new  SCR     Scan Chain Record
-------------------------------------------------------------- Per Wafer
-   02     10       WIR     Wafer Information Record
-   02     20       WRR     Wafer Results Record
-   03     30       WCR     Wafer Configuration Record
-------------------------------------------------------------- Per Part
-   05     10       PIR     Part Information Record
-   05     20       PRR     Part Results Record
-------------------------------------------------------------- Per Test Description
-   10     30       TSR     Test Synopsis Record
-------------------------------------------------------------- Per Test Execution
-   15     10       PTR     Parametric Test Record
-   15     15       MPR     Multiple-Result Parametric Record
-   15     20       FTR     Functional Test Record
-   15     30  new  STR     Scan Test Record
-------------------------------------------------------------- Per Program Segment
-   20     10       BPS     Begin Program Section Record
-   20     20       EPS     End Program Section Record
-------------------------------------------------------------- Generic Data
-   50     10       GDR     Generic Data Record
-   50     30       DTR     Datalog Text Record
-====== ====== ==== ======  ====================================
-
-
-Data Type Codes and Representation
-----------------------------------
-
-====== ==== ===================================================  ===================
-Code   2007 Description                                          C Type Specifier
-====== ==== ===================================================  ===================
-C*12        Fixed length character string:                       char[12]
-              If a fixed length character string does not fill
-              the entire field, it must be left-justified and
-              padded with spaces.
-C*n         Variable length character string:                    char[]
-              first byte = unsigned count of bytes to follow
-              (maximum of 255 bytes)
-S*n    new  Variable length character string:                    char[]
-              first two bytes = unsigned count of bytes to
-              follow (maximum of 65535 bytes)
-C*f         Variable length character string:                    char[]
-              string length is stored in another field
-U*f         Variable length U type fields where:
-              the type f is stored in another field can have
-              value 1, 2 or 4
-U*1         One byte unsigned integer                            unsigned char
-U*2         Two byte unsigned integer                            unsigned short
-U*4         Four byte unsigned integer                           unsigned long
-I*1         One byte signed integer                              char
-I*2         Two byte signed integer                              short
-I*4         Four byte signed integer                             long
-R*4         Four byte floating point number                      float
-R*8         Eight byte floating point number                     long float (double)
-B*6         Fixed length bit-encoded data                        char[6]
-V*n         Variable data type field:
-              The data type is specified by a code in the
-              first byte, and the data follows
-              (maximum of 255 bytes)
-B*n         Variable length bit-encoded field:                   char[]
-              First byte = unsigned count of bytes to follow
-              (maximum of 255 bytes).
-              First data item in least significant bit of the
-              second byte of the array (first byte is count.)
-D*n         Variable length bit-encoded field:                   char[]
-              First two bytes = unsigned count of bits to
-              follow (maximum of 65,535 bits).
-              First data item in least significant bit of the
-              third byte of the array (first two bytes are
-              count).
-              Unused bits at the high order end of the last
-              byte must be zero.
-N*1         Unsigned integer data stored in a nibble.            char
-              First item in low 4 bits, second item in high
-              4 bits. If an odd number of nibbles is indicated,
-              the high nibble of the byte will be zero. Only
-              whole bytes can be written to the STDF file.
-kxTYPE      Array of data of the type specified.                 TYPE[]
-              The value of *k* (the number of elements in the
-              array) is defined in an earlier field in the
-              record. For example, an array of short unsigned
-              integers is defined as kxU*2.
-======      ===================================================  ===================
+_author = 'dugloon'
 
 """
+======  ====================================
+Record  Type
+======  ====================================
+ATR     Audit Trail Record
+BPS     Begin Program Section Record
+DTR     Datalog Text Record
+EPS     End Program Section Record
+FAR     File Attributes Record
+FTR     Functional Test Record
+GDR     Generic Data Record
+HBR     Hardware Bin Record
+MIR     Master Information Record
+MPR     Multiple-Result Parametric Record
+MRR     Master Results Record
+PCR     Part Count Record
+PGR     Pin Group Record
+PIR     Part Information Record
+PLR     Pin List Record
+PMR     Pin Map Record
+PRR     Part Results Record
+PTR     Parametric Test Record
+RDR     Retest Data Record
+SBR     Software Bin Record
+SDR     Site Description Record
+TSR     Test Synopsis Record
+WCR     Wafer Configuration Record
+WIR     Wafer Information Record
+WRR     Wafer Results Record
+======  ====================================
+"""
 
-from Types import RecordType, UnknownRecord
+#**************************************************************************************************
+#**************************************************************************************************
+def listParser(valueList, caster, sep):
+    values = valueList.split(sep)
+    for i, value in enumerate(values):
+        if value:
+            values[i] = caster(value)
+    return values
 
-B7, B6, B5, B4, B3, B2, B1, B0, BN = 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe, 0xff
+def fpr(valueList, sep=','):
+    return listParser(valueList, float, sep)
 
-# =======================================================================
-RecordRegistrar = dict()
+def ipr(valueList, sep=','):
+    return listParser(valueList, int, sep)
 
-def recordByType(typ, sub):
-    key = (typ, sub)
-    if RecordRegistrar.has_key(key):
-        return RecordRegistrar[key]()
-    return UnknownRecord(typ, sub)
+def spr(valueList, sep=','):
+    return valueList.split(sep)
 
-# =======================================================================
-def registerMe(cls):
-    """
-    Decorator places each record class into the registrar by name and (type, subtype)
-    """
-    cls.name = cls.__name__
-    RecordRegistrar[cls.name] = RecordRegistrar[(cls.typ, cls.sub)] = cls
-    return cls
+def xnt(s0x):
+    return int(s0x, 16)
 
-@registerMe
+def xpr(valueList, sep=','):
+    return listParser(valueList, xnt, sep)
+
+       # these are the Gdr first character format character codes for vpr
+castMap = dict(U=int, M=int, B=int, I=int, S=None, L=int, F=float, D=float, T=None, X=None, Y=None, N=xnt)
+
+def vpr(value):
+    typ, val = value[0], value[1:]
+    caster = castMap.get(typ)
+    return caster(val) if caster else val
+
+arrayCasters = [fpr, ipr, spr, xpr]
+
+#**************************************************************************************************
+#**************************************************************************************************
+class RecordType(object):
+
+    def __init__(self, fieldTuple):
+        self.fieldCount = len(fieldTuple)
+
+#**************************************************************************************************
+#**************************************************************************************************
 class Far(RecordType):
     """
     **File Attributes Record (FAR)**
@@ -161,49 +106,37 @@ class Far(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(0)
-      REC_SUB  U*1  Record sub-type (10)
-      CPU_TYPE U*1  CPU type that wrote this file
-      STDF_VER U*1  STDF version number
+      CPU_TYPE C*1  A - to indicate an ATDF File
+      STDF_VER U*1  4 - STDF version number
+      ATDF_VER U*1  2 - ATDF version number
+      SCAL_FLG C*1  S - Scaling flag
       ======== ==== ========================================= ====================
 
+    Sample: FAR:A|4|2|U
+
     Notes on Specific Fields:
-      CPU_TYPE:
-        Indicates which type of CPU wrote this STDF file. This information is
-        useful for determining the CPU-dependent data representation of the
-        integer and floating point fields in the file's records. The valid values
-        are:
-
-        - 0:        DEC PDP-11 and VAX processors. F and D floating point formats
-                    will be used. G and H floating point formats will not be used.
-        - 1:        Sun1,2,3, and 4computers.
-        - 2:        Sun 386i computers, and IBM PC, IBM PC-AT, and IBM PC-XT
-                    computers.
-        - 3-127:    Reserved for future use by Teradyne.
-        - 128-255:  Reserved for use by customers.
-
-        A code defined here may also be valid for other CPU types whose data
-        formats are fully compatible with that of the type listed here. Before
-        using one of these codes for a CPU type not listed here, please check
-        with the Teradyne hotline, which can provide additional information on CPU
-        compatibility.
-      STDF_VER:
-        Identifies the version number of the STDF specification used in generating
-        the data. This allows data analysis programs to handle STDF specification
-        enhancements.
+      Scaling Flag:
+        This character indicates whether parametric
+        test results in the PTRs and MPRs are scaled
+        or unscaled. Valid values for this field are:
+        S = Scaled
+        U = Unscaled
+        If the flag is missing, the data is assumed to be scaled.
 
     Location:
       Required as the first record of the file.
     """
-    typ = 0
-    sub = 10
-    fieldMap = (
-        ('CPU_TYPE', 'U1', None),
-        ('STDF_VER', 'U1', None)
-        )
+    fieldTuple = (
+        ('CPU_TYPE', None),
+        ('STDF_VER', int),
+        ('ATDF_VER', int),
+        ('SCAL_FLG', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Far.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Atr(RecordType):
     """
     **Audit Trail Record (ATR)**
@@ -218,13 +151,11 @@ class Atr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(0)
-      REC_SUB  U*1  Record sub-type (20)
-      MOD_TIM  U*4  Date and time of STDF file
-                    modification
+      MOD_TIM  C*n  Date and time of file modification
       CMD_LINE C*n  Command line of program
       ======== ==== ========================================= ====================
+
+    Sample: ATR:0:03:00 3-SEP-1992|bin_filter 7,9-12
 
     Frequency:
       Optional. One for each filter or other data transformation program applied
@@ -240,49 +171,15 @@ class Atr(RecordType):
     Possible Use:
       Determining whether a particular filter has been applied to the data.
     """
-    typ = 0
-    sub = 20
-    fieldMap = (
-        ('MOD_TIM',  'U4', None),
-        ('CMD_LINE', 'Cn', None)
-        )
+    fieldTuple = (
+        ('MOD_TIM', None),
+        ('CMD_LINE', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Atr.fieldTuple)
 
-@registerMe
-class Vur(RecordType):
-    """
-    **Version Update Record (VUR)**
-
-    Function:
-      Version update Record is used to identify the updates over version V4.
-      Presence of this record indicates that the file may contain records defined by
-      the new standard. This record is added to the major type 0 in the STDF V4.
-
-    Data Fields:
-      ======== ==== ========================================= ====================
-      Name     Type Description                               Missing/Invalid Flag
-      ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(0)
-      REC_SUB  U*1  Record sub-type (10)
-      UPD_CNT  U*1  Count (k) of version update entries
-      UPD_NAM  kxCn Array of update version name              K=0
-      ======== ==== ========================================= ====================
-
-    Notes on Specific Fields:
-      UPD_NAM: This field will contain the version update name. For example the new
-      standard name will be stored as 'Scan:2007.1' string in the UPD_NAM field.
-
-    Location:
-      Required directly subsequent to the FAR and optional ATRs IFF this file contains 2007 record types
-    """
-    typ = 0
-    sub = 30
-    fieldMap = (
-        ('UPD_CNT',   'U1', None),
-        ('UPD_NAM', 'k0Cn', None)
-        )
-
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Mir(RecordType):
     """
     **Master Information Record (MIR)**
@@ -299,11 +196,8 @@ class Mir(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (10)
-      SETUP_T  U*4  Date and time of job setup
-      START_T  U*4  Date and time first part tested
+      SETUP_T  C*n  Date and time of job setup
+      START_T  C*n  Date and time first part tested
       STAT_NUM U*1  Tester station number
       MODE_COD C*1  Test mode code (e.g. prod, dev) space
       RTST_COD C*1  Lot retest codespace
@@ -341,6 +235,9 @@ class Mir(RecordType):
                     HOT, ROOM,and COLD if that is preferred.
       ======== ==== ========================================= ====================
 
+    Sample: MIR:A3002B|80386|80386HOT|akbar|J971|8:14:59 23-JUL-1992|8:23:02 23-JUL-1992|Sandy|P|1|2B|HOT|N|3.1.2|IG900|2.4|||300|100||
+            386_data.txt|ceramic|386|wk23||MPU2||||||386HOT|3S|||A42136S|JOAN_S  (this sample is in the ATDF order...)
+
     Frequency:
       Always required. One per data stream.
 
@@ -351,50 +248,51 @@ class Mir(RecordType):
     Possible Use:
       Header information for all reports
     """
-    typ = 1
-    sub = 10
-    fieldMap = (
-        ('SETUP_T',  'U4', None),
-        ('START_T',  'U4', None),
-        ('STAT_NUM', 'U1', None),
-        ('MODE_COD', 'C1', ' '),
-        ('RTST_COD', 'C1', ' '),
-        ('PROT_COD', 'C1', ' '),
-        ('BURN_TIM', 'U2', 0xffff),
-        ('CMOD_COD', 'C1', ' '),
-        ('LOT_ID',   'Cn', None),
-        ('PART_TYP', 'Cn', None),
-        ('NODE_NAM', 'Cn', None),
-        ('TSTR_TYP', 'Cn', None),
-        ('JOB_NAM',  'Cn', None),
-        ('JOB_REV',  'Cn', ''),
-        ('SBLOT_ID', 'Cn', ''),
-        ('OPER_NAM', 'Cn', ''),
-        ('EXEC_TYP', 'Cn', ''),
-        ('EXEC_VER', 'Cn', ''),
-        ('TEST_COD', 'Cn', ''),
-        ('TST_TEMP', 'Cn', ''),
-        ('USER_TXT', 'Cn', ''),
-        ('AUX_FILE', 'Cn', ''),
-        ('PKG_TYP',  'Cn', ''),
-        ('FAMLY_ID', 'Cn', ''),
-        ('DATE_COD', 'Cn', ''),
-        ('FACIL_ID', 'Cn', ''),
-        ('FLOOR_ID', 'Cn', ''),
-        ('PROC_ID',  'Cn', ''),
-        ('OPER_FRQ', 'Cn', ''),
-        ('SPEC_NAM', 'Cn', ''),
-        ('SPEC_VER', 'Cn', ''),
-        ('FLOW_ID',  'Cn', ''),
-        ('SETUP_ID', 'Cn', ''),
-        ('DSGN_REV', 'Cn', ''),
-        ('ENG_ID',   'Cn', ''),
-        ('ROM_COD',  'Cn', ''),
-        ('SERL_NUM', 'Cn', ''),
-        ('SUPR_NAM', 'Cn', '')
-        )
+    fieldTuple = (
+        ('LOT_ID', None),
+        ('PART_TYP', None),
+        ('JOB_NAM', None),
+        ('NODE_NAM', None),
+        ('TSTR_TYP', None),
+        ('SETUP_T', None),
+        ('START_T', None),
+        ('OPER_NAM', None),
+        ('MODE_COD', None),
+        ('STAT_NUM', int),
+        ('SBLOT_ID', None),
+        ('TEST_COD', None),
+        ('RTST_COD', None),
+        ('JOB_REV', None),
+        ('EXEC_TYP', None),
+        ('EXEC_VER', None),
+        ('PROT_COD', None),
+        ('CMOD_COD', None),
+        ('BURN_TIM', int),
+        ('TST_TEMP', None),
+        ('USER_TXT', None),
+        ('AUX_FILE', None),
+        ('PKG_TYP', None),
+        ('FAMILY_ID', None),
+        ('DATE_COD', None),
+        ('FACIL_ID', None),
+        ('FLOOR_ID', None),
+        ('PROC_ID', None),
+        ('OPER_FRQ', None),
+        ('SPEC_NAM', None),
+        ('SPEC_VER', None),
+        ('FLOW_ID', None),
+        ('SETUP_ID', None),
+        ('DSGN_REV', None),
+        ('ENG_ID', None),
+        ('ROM_COD', None),
+        ('SERL_NUM', None),
+        ('SUPR_NAM', None),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Mir.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Mrr(RecordType):
     """
     **Master Results Record (MRR)**
@@ -410,14 +308,13 @@ class Mrr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (20)
-      FINISH_T U*4  Date and time last part tested
+      FINISH_T C*n  Date and time last part tested
       DISP_COD C*1  Lot disposition code                      space
       USR_DESC C*n  Lot description supplied by user          length byte = 0
       EXC_DESC C*n  Lot description supplied by exec          length byte = 0
       ======== ==== ========================================= ====================
+
+    Sample: MRR:12:17:12 23-JUL-1992|H|Handler problems|Yield Alarm
 
     Notes on Specific Fields:
       DISP_COD:
@@ -444,16 +341,17 @@ class Mrr(RecordType):
       Repair Report
       =========================     ============================
     """
-    typ = 1
-    sub = 20
-    fieldMap = (
-        ('FINISH_T', 'U4', None),
-        ('DISP_COD', 'C1', ' '),
-        ('USR_DESC', 'Cn', ''),
-        ('EXC_DESC', 'Cn', '')
-        )
+    fieldTuple = (
+        ('FINISH_T', None),
+        ('DISP_COD', None),
+        ('USR_DESC', None),
+        ('EXC_DESC', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Mrr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Pcr(RecordType):
     """
     **Part Count Record (PCR)**
@@ -466,9 +364,6 @@ class Pcr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (30)
       HEAD_NUM U*1  Test head number                          See note
       SITE_NUM U*1  Test site number
       PART_CNT U*4  Number of parts tested
@@ -477,6 +372,9 @@ class Pcr(RecordType):
       GOOD_CNT U*4  Number of good (passed) parts tested      4,294,967,295
       FUNC_CNT U*4  Number of functional parts tested         4,294,967,295
       ======== ==== ========================================= ====================
+
+    Samples: PCR:2|1|497|5|11|212|481 (for Head 2, Site 1)
+             PCR:||3976|54|76|2311|3809 (for all test sites)
 
     Notes on Specific Fields:
       HEAD_NUM:
@@ -506,19 +404,20 @@ class Pcr(RecordType):
       Site Summary Sheet         Report for Lot Tracking System
       =========================  ==============================
     """
-    typ = 1
-    sub = 30
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('PART_CNT', 'U4', None),
-        ('RTST_CNT', 'U4', 0xffffffff),
-        ('ABRT_CNT', 'U4', 0xffffffff),
-        ('GOOD_CNT', 'U4', 0xffffffff),
-        ('FUNC_CNT', 'U4', 0xffffffff)
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('PART_CNT', int),
+        ('RTST_CNT', int),
+        ('ABRT_CNT', int),
+        ('GOOD_CNT', int),
+        ('FUNC_CNT', int)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Pcr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Hbr(RecordType):
     """
     **Hardware Bin Record (HBR)**
@@ -538,9 +437,6 @@ class Hbr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (40)
       HEAD_NUM U*1  Test head number                          See note
       SITE_NUM U*1  Test site number
       HBIN_NUM U*2  Hardware bin number
@@ -548,6 +444,9 @@ class Hbr(RecordType):
       HBIN_PF  C*1  Pass/fail indication                      space
       HBIN_NAM C*n  Name of hardware bin                      length byte = 0
       ======== ==== ========================================= ====================
+
+    Samples: HBR:2|1|6|212|F|SHORT (for Head 2, Site 1)
+             HBR:||1|1346|P|PASSED (for all test sites)
 
     Notes on Specific Fields:
       HEAD_NUM:
@@ -578,18 +477,19 @@ class Hbr(RecordType):
       Site Summary Sheet    Report for Lot Tracking System
       ===================== ==============================
     """
-    typ = 1
-    sub = 40
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('HBIN_NUM', 'U2', None),
-        ('HBIN_CNT', 'U4', None),
-        ('HBIN_PF',  'C1', ' '),
-        ('HBIN_NAM', 'Cn', '')
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('HBIN_NUM', int),
+        ('HBIN_CNT', int),
+        ('HBIN_PF', None),
+        ('HBIN_NAM', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Hbr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Sbr(RecordType):
     """
     **Software Bin Record (SBR)**
@@ -606,9 +506,6 @@ class Sbr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (50)
       HEAD_NUM U*1  Test head number                          See note
       SITE_NUM U*1  Test site number
       SBIN_NUM U*2  Software bin number
@@ -616,6 +513,9 @@ class Sbr(RecordType):
       SBIN_PF  C*1  Pass/fail indication                      space
       SBIN_NAM C*n  Name of software bin                      length byte = 0
       ======== ==== ========================================= ====================
+
+    Samples: SBR:1|2|74|14|F|NOTIFY PRODUCT ENG (for Head 1, Site 2)
+             SBR:||1|1346|P|PASSED (for all test sites)
 
     Notes on Specific Fields:
       HEAD_NUM:
@@ -646,18 +546,19 @@ class Sbr(RecordType):
       Site Summary Sheet    Report for Lot Tracking System
       ===================== ================================
     """
-    typ = 1
-    sub = 50
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('SBIN_NUM', 'U2', None),
-        ('SBIN_CNT', 'U4', None),
-        ('SBIN_PF',  'C1', ' '),
-        ('SBIN_NAM', 'Cn', '')
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('SBIN_NUM', int),
+        ('SBIN_CNT', int),
+        ('SBIN_PF', None),
+        ('SBIN_NAM', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Sbr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Pmr(RecordType):
     """
     **Pin Map Record (PMR)**
@@ -671,9 +572,6 @@ class Pmr(RecordType):
       ======== ==== ========================================= ====================
       Name     Type Description                               Missing/Invalid Flag
       ======== ==== ========================================= ====================
-      REC_LEN  U*2  Bytes of data following header
-      REC_TYP  U*1  Record type(1)
-      REC_SUB  U*1  Record sub-type (60)
       PMR_INDX U*2  Unique index associated with pin
       CHAN_TYP U*2  Channel type                              0
       CHAN_NAM C*n  Channel namei                             length byte = 0
@@ -682,6 +580,8 @@ class Pmr(RecordType):
       HEAD_NUM U*1  Head number associated with channel       1
       SITE_NUM U*1  Site number associated with channel       1
       ======== ==== ========================================= ====================
+
+    Sample: PMR:2|A|1-7|GND|MAIN GROUND|2|1
 
     Notes on Specific Fields:
       PMR_INDX:
@@ -715,19 +615,20 @@ class Pmr(RecordType):
       * Functional Datalog
       * Functional Histogram
     """
-    typ = 1
-    sub = 60
-    fieldMap = (
-        ('PMR_INDX', 'U2', None),
-        ('CHAN_TYP', 'U2', 0),
-        ('CHAN_NAM', 'Cn', ''),
-        ('PHY_NAM',  'Cn', ''),
-        ('LOG_NAM',  'Cn', ''),
-        ('HEAD_NUM', 'U1', 1),
-        ('SITE_NUM', 'U1', 1)
-        )
+    fieldTuple = (
+        ('PMR_INDX', int),
+        ('CHAN_TYP', int),
+        ('CHAN_NAM', None),
+        ('PHY_NAM', None),
+        ('LOG_NAM', None),
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Pmr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Pgr(RecordType):
     """
     **Pin Group Record (PGR)**
@@ -739,20 +640,18 @@ class Pgr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(1)
-      REC_SUB  U*1   Record sub-type (62)
       GRP_INDX U*2   Unique index associated with pin group
       GRP_NAM  C*n   Name of pin group                        length byte = 0
-      INDX_CNT U*2   Count (k)of PMR indexes
-      PMR_INDX kxU*2 Array of indexes for pins in the group   INDX_CNT=0
+      PMR_INDX kU*2  Array of indexes for pins in the group   INDX_CNT=0
       ======== ===== ======================================== ====================
+
+    Sample: PGR:12|Data Out|5,6,7,8,9,10,11,12
 
     Notes on Specific Fields:
       GRP_INDX:
         The range of legal group index numbers is 32,768 - 65,535.
-      INDX_CNT, PMR_INDX:
-        PMR_INDX is an array of PMR indexes whose length is defined by INDX_CNT.
+      PMR_INDX:
+        PMR_INDX is an array of PMR indexes.
         The order of the PMR indexes should be from most significant to least
         significant bit in the pin group (regardless of the order of PMR index
         numbers).
@@ -768,16 +667,16 @@ class Pgr(RecordType):
     Possible Use:
       Functional Datalog
     """
-    typ = 1
-    sub = 62
-    fieldMap = (
-        ('GRP_INDX',   'U2', None),
-        ('GRP_NAM',    'Cn', ''),
-        ('INDX_CNT',   'U2', None),
-        ('PMR_INDX', 'k2U2', [])
-        )
+    fieldTuple = (
+        ('GRP_INDX', int),
+        ('GRP_NAM', None),
+        ('PMR_INDX', ipr)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Pgr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Plr(RecordType):
     """
     **Pin List Record (PLR)**
@@ -789,18 +688,15 @@ class Plr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(1)
-      REC_SUB  U*1   Record sub-type (63)
-      GRP_CNT  U*2   Count (k)of pins or pin groups
-      GRP_INDX kxU*2 Array of pin or pin group indexes
-      GRP_MODE kxU*2 Operating mode of pin group              0
-      GRP_RADX kxU*1 Display radix of pin group0
-      PGM_CHAR kxC*n Program state encoding characters        length byte = 0
-      RTN_CHAR kxC*n Return state encoding characters         length byte = 0
-      PGM_CHAL kxC*n Program state encoding characters        length byte = 0
-      RTN_CHAL kxC*n Return state encoding characters         length byte = 0
+      GRP_INDX k*2   Array of pin or pin group indexes
+      GRP_MODE kU*2  Operating mode of pin group              0
+      GRP_RADX kU*1  Display radix of pin group0
+      PGM_CLCR kC*n  Program state encoding characters        length byte = 0
+      RTN_CLCR kC*n  Return state encoding characters         length byte = 0
       ======== ===== ======================================== ====================
+
+    Sample:
+        PLR:2,3,6|20,20,21|H,H,H|H,L,L/H,H,H/L,L,L|1,0,M/1,0,H/M,L,H
 
     Notes on Specific Fields:
       GRP_CNT:
@@ -826,29 +722,57 @@ class Plr(RecordType):
         customer use.
       GRP_RADX:
         The following are valid values for the pin group display radix:
-          * 0 = Use display program default
-          * 2 = Display in Binary
-          * 8= Display in Octal
-          * 10 = Display in Decimal
-          * 16 = Display in Hexadecimal
-          * 20 = Display as symbolic
+            B = Display in Binary
+            O = Display in Octal
+            D = Display in Decimal
+            H = Display in Hexadecimal
+            S = Display as symbolic
 
       PGM_CHAR, PGM_CHAL:
-        These ASCII characters are used to display the programmed state in
-        the FTR or MPR. Use of these character arrays makes it possible to
-        store tester-dependent display representations in a tester-independent
-        format. If a single character is used to represent each programmed state,
-        then only the PGM_CHAR array need be used. If two characters represent
-        each state, then the first (left) character is stored in PGM_CHAL and
-        the second (right) character is stored in PGM_CHAR .
-      RTN_CHAR,RTN_CHAL:
-        These ASCII characters are used to display the returned state in
-        the FTR or MPR .Use of these character arrays makes it possible to
-        store tester-dependent display representations in a tester-independent
-        format. If a single character is used to represent each returned state,
-        then only the RTN_CHAR array need be used. If two characters represent
-        each state, then the first (left) character is stored in RTN_CHAL and
-        the second (right) character is stored in RTN_CHAR .
+        Programmed state codes are used to display the
+        programmed state in the FTR or MPR record.
+        Use of this field makes it possible to store tester dependent
+        display representations in a tester independent
+        format.
+        The programmed state field consists of an array
+        of lists of state codes. One or two characters may
+        be used to represent each entry in a
+        programmed state list (one for each state for
+        which the pin or pin group can be programmed).
+        If one character is used, then on conversion to
+        STDF, it will be stored in the PGM_CHAR field. If
+        two characters are used, then the first will be
+        stored in PGM_CHAL and the second will be
+        stored in PGM_CHAR. If more than two
+        characters are in the item, only the first two will
+        be used. Entries in the programmed state list
+        must be separated by commas.
+        The programmed state array will have one list for
+        each entry of the Index Array. Lists will be
+        separated within the array using the slash /
+        character.
+      RTN_CHAR, RTN_CHAL:
+        Returned state codes are used to display the
+        returned state in the FTR or MPR record. Use of
+        this array makes it possible to store tester dependent
+        display representations in a tester independent
+        format.
+        The returned state field consists of an array of
+        lists of state codes. One or two characters may
+        be used to represent each entry in a returned
+        state list (one for each state for which the pin or
+        pin group can output). If one character is used,
+        then on conversion to STDF, it will be stored in
+        the RTN_CHAR field. If two characters are used,
+        then the first will be stored in RTN_CHAL and the
+        second will be stored in RTN_CHAR. If more
+        than two characters are in the item, only the first
+        two will be used. Entries in the returned state list
+        must be separated by commas.
+        The returned state array will have one list for
+        each entry of the Index Array. Lists will be
+        separated within the array using the slash /
+        character.
 
     Note on Missing/Invalid Data Flags:
       For each field, the missing/invalid data flag applies to each member of
@@ -874,20 +798,18 @@ class Plr(RecordType):
     Possible Use:
       Functional Datalog
     """
-    typ = 1
-    sub = 63
-    fieldMap = (
-        ('GRP_CNT',    'U2', None),
-        ('GRP_INDX', 'k0U2', None),
-        ('GRP_MODE', 'k0U2', 0),
-        ('GRP_RADX', 'k0U1', 0),
-        ('PGM_CHAR', 'k0Cn', []),
-        ('RTN_CHAR', 'k0Cn', []),
-        ('PGM_CHAL', 'k0Cn', []),
-        ('RTN_CHAL', 'k0Cn', [])
-        )
+    fieldTuple = (
+        ('GRP_INDX', ipr),
+        ('GRP_MODE', ipr),
+        ('GRP_RADX', spr),
+        ('PGM_CLCR', spr),
+        ('RTN_CLCR', spr)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Plr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Rdr(RecordType):
     """
     **Retest Data Record (RDR)**
@@ -901,21 +823,18 @@ class Rdr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(1)
-      REC_SUB  U*1   Record sub-type (70)
-      NUM_BINS U*2   Number (k)ofbinsbeing retested
-      RTST_BIN kxU*2 Array of retest bin numbers              NUM_BINS=0
+      RTST_BIN kU*2 Array of retest bin numbers              NUM_BINS=0
       ======== ===== ======================================== ====================
 
+    Sample: RDR:4,5,7
+
     Notes on Specific Fields:
-      NUM_BINS,RTST_BIN:
-        NUM_BINS indicates the number of hardware bins being retested and there
-        fore the size of the RTST_BIN array that follows. If NUM_BINS is zero,
-        then all bins in the lot are being retested and RTST_BIN is omitted.
-        The LOT_ID, SUBLOT_ID, and TEST_COD of the current STDF file should match
-        those of the STDF file that is being retested, so the data can be properly
-        merged at a later time.
+      RTST_BIN:
+        Array of bin numbers being retested. Bin numbers in the
+        array will be separated by commas. If all bins are being
+        retested, this field should be omitted and the record will
+        consist of only the record header. Otherwise the field is
+        required.
 
     Frequency:
       Optional. One per data stream.
@@ -927,14 +846,14 @@ class Rdr(RecordType):
     Possible Use:
       Tells data filtering programs how to handle retest data.
     """
-    typ = 1
-    sub = 70
-    fieldMap = (
-        ('NUM_BINS',   'U2', None),
-        ('RTST_BIN', 'k0U2', [])
-        )
+    fieldTuple = (
+        ('RTST_BIN', ipr),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Rdr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Sdr(RecordType):
     """
     **Site Description Record (SDR)**
@@ -947,13 +866,10 @@ class Sdr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(1)
-      REC_SUB  U*1   Record sub-type (80)
       HEAD_NUM U*1   Test head number
       SITE_GRP U*1   Site group number
       SITE_CNT U*1   Number (k) of test sites in site group
-      SITE_NUM kxU*1 Array of test site numbers
+      SITE_NUM kU*1  Array of test site numbers
       HAND_TYP C*n   Handler or prober type                   length byte = 0
       HAND_ID  C*n   Handler or prober ID                     length byte = 0
       CARD_TYP C*n   Probe card type                          length byte = 0
@@ -971,6 +887,8 @@ class Sdr(RecordType):
       EXTR_TYP C*n   Extra equipment type field               length byte = 0
       EXTR_ID  C*n   Extra equipment ID                       length byte = 0
       ======== ===== ======================================== ====================
+
+    Sample: SDR:2|4|5,6,7,8|Delta Flex|D511||B101|17
 
     Notes on Specific Fields:
       SITE_GRP:
@@ -1000,333 +918,32 @@ class Sdr(RecordType):
     Possible Use:
       Correlation of yield to interface or peripheral equipment
     """
-    typ = 1
-    sub = 80
-    fieldMap = (
-        ('HEAD_NUM',   'U1', None),
-        ('SITE_GRP',   'U1', None),
-        ('SITE_CNT',   'U1', None),
-        ('SITE_NUM', 'k2U1', None),
-        ('HAND_TYP',   'Cn', ''),
-        ('HAND_ID',    'Cn', ''),
-        ('CARD_TYP',   'Cn', ''),
-        ('CARD_ID',    'Cn', ''),
-        ('LOAD_TYP',   'Cn', ''),
-        ('LOAD_ID',    'Cn', ''),
-        ('DIB_TYP',    'Cn', ''),
-        ('DIB_ID',     'Cn', ''),
-        ('CABL_TYP',   'Cn', ''),
-        ('CABL_ID',    'Cn', ''),
-        ('CONT_TYP',   'Cn', ''),
-        ('CONT_ID',    'Cn', ''),
-        ('LASR_TYP',   'Cn', ''),
-        ('LASR_ID',    'Cn', ''),
-        ('EXTR_TYP',   'Cn', ''),
-        ('EXTR_ID',    'Cn', '')
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_GRP', int),
+        ('SITE_NUM', ipr),
+        ('HAND_TYP', None),
+        ('HAND_ID', None),
+        ('CARD_TYP', None),
+        ('CARD_ID', None),
+        ('LOAD_TYP', None),
+        ('LOAD_ID', None),
+        ('DIB_TYP', None),
+        ('DIB_ID', None),
+        ('CABL_TYP', None),
+        ('CABL_ID', None),
+        ('CONT_TYP', None),
+        ('CONT_ID', None),
+        ('LASR_TYP', None),
+        ('LASR_ID', None),
+        ('EXTR_TYP', None),
+        ('EXTR_ID', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Sdr.fieldTuple)
 
-@registerMe
-class Psr(RecordType):
-    """
-    **Pattern Sequence Record (SDR)**
-
-    Function:
-      PSR record contains the information on the pattern profile for a specific
-      executed scan test as part of the Test Identification information. In particular it
-      implements the Test Pattern Map data object in the data model. It specifies
-      how the patterns for that test were constructed. There will be a PSR record for
-      each scan test in a test program. A PSR is referenced by the STR (Scan Test
-      Record) using its PSR_INDX field
-
-    Data Fields:
-      ======== ===== ======================================== ====================
-      Name     Type  Description                              Missing/Invalid Flag
-      ======== ===== ======================================== ====================
-      CONT_FLG B*1   Continuation PSR record exist; default 0
-      PSR_INDX U*2   PSR Record Index (used by STR records)
-      PSR_NAM  C*n   Symbolic name of PSR record length byte = 0
-      OPT_FLG  B*1   Contains PAT_LBL, FILE_UID, ATPG_DSC,
-                     and SRC_ID field missing flag bits and
-                     flag for start index for first cycle number.
-      TOTP_CNT U*2   Count of total pattern file information
-                     sets in the complete PSR data set
-      LOCP_CNT U*2   Count (k) of pattern file information
-                     sets in this record
-      PAT_BGN  kxU8  Array of Cycle #s patterns begins on
-      PAT_END  kxU8  Array of Cycle #s patterns stops at
-      PAT_FILE kxCn  Array of Pattern File Names
-      PAT_LBL  K*Cn  Optional pattern symbolic name           OPT_FLG bit 0 = 1
-      FILE_UID kxCn  Optional array of file identifier code   OPT_FLG bit 1 = 1
-      ATPG_DSC kxCn  Optional array of ATPG information       OPT_FLG bit 2 = 1
-      SRC_ID   kxCn  Optional array of PatternInSrcFileID     OPT_FLG bit 3 = 1
-      ======== ===== ======================================== ====================
-
-    Notes on Specific Fields:
-        CONT_FLG: This flag is used to indicated existence of continuation PSR records. If it
-        is set to 1 then it mean a continuation PSR exists. A 0 value indicated that this is the last PSR record.
-
-        PSR_INDX: This is a unique identifier for the set of PSRs that describe the patterns for a scan test.
-
-        PSR_NAM: It is a symbolic name of the test suite to which this PSR belongs. For
-        example with reference to figure 8, it would be stuck-at for the test_suite #1.
-
-        OPT_FLG: This flag is used to indicate the presence of optional fields. The bit
-        assignment for the optional fields in as shown in Table 3. If the bit is set to 1 the
-        corresponding optional field is considered missing
-            Optional Field Flags in PSR
-            Bit Description
-            0   Symbolic pattern label missing
-            1   Unique File Identifier for the file is missing
-            2   Details of ATPG used to create the patterns
-            3   Identification of a pattern within a source file
-            4   The first cycle number is determined by the value of this bit.
-            5   The first pattern number is determined by the value of this bit (0 or 1)
-            6   The bit position starts with the value of this bit
-
-        TOTP_CNT: This field indicates the total number of pattern that make up a scan test
-        over all the PSRs. The description of all the patterns may not fit into a single PSR as
-        mention above. For continuation records this should be the same count as for the first
-        record (i.e. the final total)
-
-        LOCP_CNT: This field indicates the total number of patterns that are described in the
-        current PSR from a scan test.
-
-        NOTE 1 The next set of fields is repeated for each pattern that is contained in a scan test.
-        Each of these fields is stored in its own array of size LOCAL_CNT.
-
-        PAT_FILE : The name of the ATPG file from which the current pattern was created
-
-        PAT_BGN: The cycle count the specified ATPG pattern begins on where the 1st cycle
-        number is determined by the OPT_FLG (bit 4).
-
-        PAT_END : The cycle count the specified ATPG pattern ends on.
-
-        PAT_LBL: (Optional) This is a symbolic name of the pattern within a test suite. For
-        example, with reference to figure 8 it will be P1 for the pattern coming from file1.
-
-        FILE_UID: (Optional) - Unique character string that uniquely identifies the file. This
-        field is provided as a means to additionally uniquely identify the source file. The exact
-        mechanism to use this field is decided by the ATPG software, which will also provide
-        this piece of information in the source files during the translation process.
-
-        SRC_ID: (Optional) - The name of the specific PatternExec block in the source file. In
-        case there are multiple patterns being specified in the source file e.g. multiple
-        PatternExec blocks in STIL, this field specifies the one, which is the source of the pattern
-        in this PSR
-
-        ATPG_DSC (Optional) - This field intended to be used to store any ASCII data that can
-        identify the source tool, time of generation etc.
-    """
-    typ = 1
-    sub = 90
-    fieldMap = (
-        ('CONT_FLG',   'B1', None),
-        ('PSR_INDX',   'U2', None),
-        ('PSR_NAM',    'Cn', ''),
-        ('OPT_FLG',    'B1', BN),
-        ('TOTP_CNT',   'U2', None),
-        ('LOCP_CNT',   'U2', None),
-        ('PAT_BGN',  'k5U8', None),
-        ('PAT_END',  'k5U8', None),
-        ('PAT_FILE', 'k5Cn', None),
-        ('PAT_LBL',  'k5Cn', ('OPT_FLG', B0)),
-        ('FILE_UID', 'k5Cn', ('OPT_FLG', B1)),
-        ('ATPG_DSC', 'k5Cn', ('OPT_FLG', B2)),
-        ('SRC_ID',   'k5Cn', ('OPT_FLG', B3)),
-        )
-
-@registerMe
-class Nmr(RecordType):
-    """
-    **Name Map Record (NMR)**
-
-    Function:
-        This record contains a map of PMR indexes to ATPG signal names. This
-        record is designed to allow preservation of ATPG signal names used in the
-        ATPG files through the datalog output. This record is only required when the
-        standard PMR records do not contain the ATPG signal name
-
-    Data Fields:
-        ======== ===== ======================================== ====================
-        Name     Type  Description                              Missing/Invalid Flag
-        ======== ===== ======================================== ====================
-        CONT_FLG B*1   Continuation PSR record exist; default 0
-        NMR_INDX U*2   NMR record unique index
-        TOTM_CNT U*2   Count of PMR indexes and ATPG_NAM entries 0
-        LOCM_CNT U*2   Count of (k) PMR indexes and ATPG_NAM
-                       entries in this record                    0
-        PMR_INDX kxU*2 Array of PMR indexes                      LOCM_CNT=0
-        ATPG_NAM kxC*n Array of ATPG signal names                LOCM_CNT=0
-        ======== ===== ======================================== ====================
-
-    Notes on Specific Fields:
-        NMR_INDX: This is a unique identifier for one for each NMR record. A set of NMR
-            records can be defined multiple mapping from pin names to ATPG names. The particular
-            mapping used by a test can identified by referencing the corresponding NMR its
-        NMR_INDX in the STR field. NMR_INDX values start at 1.
-        TOTM_CNT: This the count of total number of entries in the mapping table across all
-            the NMR records
-        LOCM_CNT: The count of number of entries in the current NMR record.
-        PMR_INDX: It is the array of PMR indexes for which the ATPG names are provided
-        ATPG_NAM: It is the array ATPG signal names corresponding to the pin in
-            PMR_INDX array.
-    """
-    typ = 1
-    sub = 91
-    fieldMap = (
-        ('CONT_FLG',   'B1', None),
-        ('NMR_INDX',   'U2', None),
-        ('TOTM_CNT',   'U2', 0),
-        ('LOCM_CNT',   'U2', 0),
-        ('PMR_INDX', 'k3U2', []),
-        ('ATPG_NAM', 'k3Cn', []),
-        )
-
-@registerMe
-class Cnr(RecordType):
-    """
-    **Scan Cell Name Record (CNR)**
-
-    Function:
-        This record is used to store the mapping from Chain and Bit position to the
-        Cell/FlipFlop name. A CNR record should be created for each Cell for which
-        a name mapping is required. Typical usage would be to create a record for
-        each failing cell/FlipFlop. A CNR with new mapping for a chain and bit
-        position would override the previous mapping.
-
-    Data Fields:
-        ======== ===== ======================================== ====================
-        Name     Type  Description                              Missing/Invalid Flag
-        ======== ===== ======================================== ====================
-        CHN_NUM  U*2   Chain number. Referenced by the
-                       CHN_NUM array in an STR record
-        BIT_POS  U*4   Bit position in the chain
-        CELL_NAM S*n   Scan Cell Name
-        ======== ===== ======================================== ====================
-
-    Notes on Specific Fields:
-        CHN_NUM: This is the array for the chain identification for the target Flip Flop for
-            which the name is provided in the table.
-        BIT_POS: This is an array for the bit position within the chain identified by the
-            CHAIN_NO field for the target Flip Flop for which the name is provided in the table.
-        CELL_NAM: The is name of the of Flip Flop at the CHN_NUM and BIT_POS. Please
-            note the type of this field is S*n where the length of the Flip Flop name is stored in the
-            first two bytes and then the name follows.
-    """
-    typ = 1
-    sub = 92
-    fieldMap = (
-        ('CHN_NUM',  'U2', None),
-        ('BIT_POS',  'U4', None),
-        ('CELL_NAM', 'Sn', None),
-        )
-
-@registerMe
-class Ssr(RecordType):
-    """
-    **Scan Structure Record (CNR)**
-
-    Function:
-        This record contains the Scan Structure information normally found in a STIL
-        file. The SSR is a top level Scan Structure record that contains an array of
-        indexes to CDR (Chain Description Record) records which contain the chain
-        information.
-
-    Data Fields:
-        ======== ===== ======================================== ====================
-        Name     Type  Description                              Missing/Invalid Flag
-        ======== ===== ======================================== ====================
-        SSR_NAM  C*n   Name of the STIL Scan Structure for reference    Length byte = 0
-        CHN_CNT  U*2   Count (k) of number of Chains listed in CHN_LIST
-        CHN_LIST kxU*2 Array of CDR Indexes
-        ======== ===== ======================================== ====================
-
-    Notes on Specific Fields:
-        SSR_NAM: This is a ASCII unique name for the scan structure record that is normally
-            provided by the STIL (IEEE 1450) file.
-        CHN_CNT: It is the count of number of scan chains in a scan structure.
-        CHN_LIST: It is an array of index of each chain that is part of this scan structure. No
-            particular order of the scan chain indexes is specified by the standard.
-    """
-    typ = 1
-    sub = 93
-    fieldMap = (
-        ('SSR_NAM',    'Cn', ''),
-        ('CHN_CNT',    'U2', None),
-        ('CHN_LIST', 'k1U2', None),
-        )
-
-@registerMe
-class Cdr(RecordType):
-    """
-    **Chain Description Record (CNR)**
-
-    Function:
-        This record contains the description of a scan chain in terms of its input,
-        output, number of cell and clocks. Each CDR record contains description of
-        exactly one scan chain. Each CDR is uniquely identified by an index.
-
-    Data Fields:
-        ======== ===== ======================================== ====================
-        Name     Type  Description                              Missing/Invalid Flag
-        ======== ===== ======================================== ====================
-        CONT_FLG B*1   Continuation CDR record follows if not 0
-        CDR_INDX U*2   SCR Index
-        CHN_NAM  C*n   Chain Name Length byte = 0
-        CHN_LEN  U*4   Chain Length (# of scan cells in chain)
-        SIN_PIN  U*2   PMR index of the chain's Scan In Signal      0
-        SOUT_PIN U*2   PMR index of the chain's Scan Out Signal     0
-        MSTR_CNT U*1   Count (m) of master clock pins
-                       specified for this scan chain
-        M_CLKS   mxU*2 Array of PMR indexes for the master
-                       clocks assigned to this chain                MSTR_CNT=0
-        SLAV_CNT U*1   Count (n) of slave clock pins specified
-                       for this scan chain
-        S_CLKS   nxU*2 Array of PMR indexes for the slave
-                       clocks assigned to this chain                SLAV_CNT=0
-        INV_VAL  U*1   0: No Inversion, 1: Inversion 255
-        LST_CNT  U*2   Count (k) of scan cells listed in this record
-        CELL_LST kxS*n Array of Scan Cell Names LST_CNT=0
-        ======== ===== ======================================== ====================
-
-    Notes on Specific Fields:
-        CDR_INDX: This is a unique number assigned to each CDR. It is used by the SSR
-            record to reference a particular CDR.
-        CHN_NAM: This is an optional ASCII unique name for the scan chain (user
-            defined or derived/copied from ATPG files).
-        TOTS_CNT: The number of scan cells contained within the scan chain
-        LOCS_CNT: The number of scan cells listed in this record (the others are listed in continuation SCR records)
-        SIN_PIN: The PMR record index for the chain's Scan In signal
-        SOUT_PIN: The PMR record index for the chain's Scan Out signal
-        MSTR_CNT: The # of master clock pins assigned to the scan chain
-        SLAV_CNT: The # of slave clock pins assigned to the scan chain
-        M_CLKS: An optional array of PMR indexes for the chain's master clock pins
-            The length of this array is specified in the MSTR_CNT field
-        S_CLKS: An optional array of PMR indexes for the chain's slave clock pins
-            The length of this array is specified in the SLAV_CNT field.
-        INV_VAL: A Boolean value to indicate if the Scan_Out signal is inverted from the
-            Scan_In signal. A 0 value indicated no inversion. A value of 255 indicates unknown status.
-        CELL_LST: The array of scan cell names.
-    """
-    typ = 1
-    sub = 94
-    fieldMap = (
-        ('CONT_FLG',    'B1', None),
-        ('CDR_INDX',    'U2', None),
-        ('CHN_NAM',     'Cn', ''),
-        ('CHN_LEN',     'U2', None),
-        ('SIN_PIN',     'U2', 0),
-        ('SOUT_PIN',    'U2', 0),
-        ('MSTR_CNT',    'U1', None),
-        ('M_CLKS',    'k6U2', []),
-        ('SLAV_CNT',    'U1', None),
-        ('S_CLKS',    'k8U2', []),
-        ('INV_VAL',     'U1', 0xff),
-        ('LST_CNT',     'U2', None),
-        ('CELL_LST', 'k11Sn', []),
-        )
-
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Wir(RecordType):
     """
     **Wafer Information Record (WIR)**
@@ -1342,14 +959,13 @@ class Wir(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(2)
-      REC_SUB  U*1   Record sub-type (10)
       HEAD_NUM U*1   Test head number
       SITE_GRP U*1   Site group number                        255
-      START_T  U*4   Date and time first part tested
+      START_T  C*n   Date and time first part tested
       WAFER_ID C*n   Wafer ID                                 length byte = 0
       ======== ===== ======================================== ====================
+
+    Sample: WIR:1|8:23:02 23-JUL-1992|2
 
     Notes on Specific Fields:
       SITE_GRP:
@@ -1374,16 +990,17 @@ class Wir(RecordType):
       * Datalog
       * Wafer Map
     """
-    typ = 2
-    sub = 10
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_GRP', 'U1', 0xff),
-        ('START_T',  'U4', None),
-        ('WAFER_ID', 'Cn', '')
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('START_T', None),
+        ('SITE_GRP', int),
+        ('WAFER_ID', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Wir.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Wrr(RecordType):
     """
     **Wafer Results Record (WRR)**
@@ -1399,9 +1016,6 @@ class Wrr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(2)
-      REC_SUB  U*1   Record sub-type (20)
       HEAD_NUM U*1   Test head number
       SITE_GRP U*1   Site group number                        255
       FINISH_T U*4   Date and time last part tested
@@ -1418,8 +1032,10 @@ class Wrr(RecordType):
       EXC_DESC C*n   Wafer description supplied by exec       length byte = 0
       ======== ===== ======================================== ====================
 
+    Sample: WRR:1|11:02:42 23-JUL-1992|492|W01|3|102|214|2|131|MOS-4|F54|S3-1|Glass buildup on prober|Yield alarm on wafer W01
+
     Notes on Specific Fields:
-      SITE_GRP:
+    SITE_GRP:
         Refers to the site group in the SDR .This is a means of relating the
         wafer information to the configuration of the equipment used to test
         it. If this information is not known, or the tester does not support
@@ -1450,26 +1066,27 @@ class Wrr(RecordType):
       * Datalog
       * Wafer Map
     """
-    typ = 2
-    sub = 20
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_GRP', 'U1', 0xff),
-        ('FINISH_T', 'U4', None),
-        ('PART_CNT', 'U4', None),
-        ('RTST_CNT', 'U4', 0xffffffff),
-        ('ABRT_CNT', 'U4', 0xffffffff),
-        ('GOOD_CNT', 'U4', 0xffffffff),
-        ('FUNC_CNT', 'U4', 0xffffffff),
-        ('WAFER_ID', 'Cn', ''),
-        ('FABWF_ID', 'Cn', ''),
-        ('FRAME_ID', 'Cn', ''),
-        ('MASK_ID',  'Cn', ''),
-        ('USR_DESC', 'Cn', ''),
-        ('EXC_DESC', 'Cn', '')
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('FINISH_T', None),
+        ('PART_CNT', int),
+        ('WAFER_ID', None),
+        ('SITE_GRP', int),
+        ('RTST_CNT', int),
+        ('ABRT_CNT', int),
+        ('GOOD_CNT', int),
+        ('FUNC_CNT', int),
+        ('FABWF_ID', None),
+        ('FRAME_ID', None),
+        ('MASK_ID', None),
+        ('USR_DESC', None),
+        ('EXC_DESC', None)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Wrr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Wcr(RecordType):
     """
     **Wafer Configuration Record (WCR)**
@@ -1484,9 +1101,6 @@ class Wcr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(2)
-      REC_SUB  U*1   Record sub-type (30)
       WAFR_SIZ R*4   Diameter of wafer in WF_UNITS            0
       DIE_HT   R*4   Height of die in WF_UNITS                0
       DIE_WID  R*4   Width of die in WF_UNITS                 0
@@ -1497,6 +1111,8 @@ class Wcr(RecordType):
       POS_X    C*1   Positive X direction of wafer            space
       POS_Y    C*1   Positive Y direction of wafer            space
       ======== ===== ======================================== ====================
+
+    Sample: WCR:D|R|D|5|.3|.25|1|23|19      # The ATDF spec has different order than the STDF spec # TODO verify
 
     Notes on Specific Fields:
       WF_UNITS:
@@ -1515,22 +1131,35 @@ class Wcr(RecordType):
           * space = Unknown
       CENTER_X, CENTER_Y:
         Use the value -32768 to indicate that the field is invalid.
+      POS_X: Positive X direction on the wafer. Valid values are:
+        L = Left
+        R = Right
+        If more than one character appears in this field, it
+        will be truncated to the first character during
+        conversion to STDF.
+      POS_Y Positive Y direction on the wafer. Legal values are:
+        U = Up
+        D = Down
+        If more than one character appears in this field, it
+        will be truncated to the first character during
+        conversion to STDF.
     """
-    typ = 2
-    sub = 30
-    fieldMap = (
-        ('WAFR_SIZ', 'R4', 0),
-        ('DIE_HT',   'R4', 0),
-        ('DIE_WID',  'R4', 0),
-        ('WF_UNITS', 'U1', 0),
-        ('WF_FLAT',  'C1', ' '),
-        ('CENTER_X', 'I2', -32768),
-        ('CENTER_Y', 'I2', -32768),
-        ('POS_X',    'C1', ' '),
-        ('POS_Y',    'C1', ' ')
-        )
+    fieldTuple = (
+        ('WF_FLAT', None),
+        ('POS_X', None),
+        ('POS_Y', None),
+        ('WAFR_SIZ', float),
+        ('DIE_HT', float),
+        ('DIE_WID', float),
+        ('WF_UNITS', int),
+        ('CENTER_X', int),
+        ('CENTER_Y', int),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Wcr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Pir(RecordType):
     """
     **Part Information Record (PIR)**
@@ -1544,12 +1173,11 @@ class Pir(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(5)
-      REC_SUB  U*1   Record sub-type (10)
       HEAD_NUM U*1   Test head number
       SITE_NUM U*1   Test site number
       ======== ===== ======================================== ====================
+
+    Sample: PIR:2|1
 
     Notes on Specific Fields:
       HEAD_NUM,SITE_NUM:
@@ -1571,14 +1199,15 @@ class Pir(RecordType):
     Possible Use:
       Datalog
     """
-    typ = 5
-    sub = 10
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None)
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int)
+    )
+    def __init__(self):
+        RecordType.__init__(self, Pir.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Prr(RecordType):
     """
     **Part Results Record (PRR)**
@@ -1592,9 +1221,6 @@ class Prr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(5)
-      REC_SUB  U*1   Record sub-type (20)
       HEAD_NUM U*1   Test head number
       SITE_NUM U*1   Test site number
       PART_FLG B*1   Part information flag
@@ -1608,6 +1234,8 @@ class Prr(RecordType):
       PART_TXT C*n   Part description text                    length byte = 0
       PART_FIX B*n   Part repair information                  length byte = 0
       ======== ===== ======================================== ====================
+
+    PRR:2|1|13|78|F|0|17|-2|7|||644|Device at edge of wafer|F13C20
 
     Notes on Specific Fields:
       HEAD_NUM, SITE_NUM:
@@ -1623,51 +1251,20 @@ class Prr(RecordType):
       X_COORD, Y_COORD, PART_ID:
         Are all optional, but you should provide either the PART_ID or the X_COORD
         and Y_COORD in order to make the resultant data use ful for analysis.
-      PART_FLG:
-        Contains the following fields:
-
-          * bit 0:
-
-            * 0 = This is a new part. Its data device does not supersede that of
-              any previous device.
-            * 1 = The PIR, PTR, MPR, FTR, and PRR records that make up the current
-              sequence (identified as having the same HEAD_NUM and SITE_NUM)
-              supersede any previous sequence of records with the same PART_ID.(A
-              repeated part sequence usually indicates a mistested part.)
-          * bit 1:
-
-            * 0 = This is a new part. Its data device does not supersede that of
-              any previous device.
-            * 1 = The PIR, PTR, MPR, FTR, and PRR records that make up the current
-              sequence (identified as having the same HEAD_NUM and SITE_NUM)
-              supersede any previous sequence of records with the same X_COORD and
-              Y_COORD.(A repeated part sequence usually indicates a mistested
-              part.)
-
-          Note:
-            Either Bit 0 or Bit 1 can be set, but not both. (It is also valid to
-            have neither set.)
-
-          * bit2:
-
-            * 0 = Part testing completed normally
-            * 1 = Abnormal end of testing
-
-          * bit3:
-
-            * 0 = Part passed
-            * 1 = Part failed
-
-          * bit 4:
-
-            * 0 = Pass/fail flag (bit 3) is valid
-            * 1 = Device completed testing with no pass/fail indication
-              (i.e., bit 3 is invalid)
-
-          * bits 5 - 7:
-
-            Reserved for future use  must be 0
-
+      PART_FLG: bits 3 & 4
+        Legal values for the pass/fail code are:
+        P = Part passed
+        F = Part failed
+      PART_FLG: bits 0 or 1
+        The presence of a value in this field indicates
+        that this is a retested device, and that the data
+        in this record supersedes data for the device
+        with the same identifier. The actual value of this
+        field indicates that the superseded device data
+        is identified by:
+        I = Same Part ID
+        C = Same X/Y Coordinates
+        If not a retest, this field is empty.
       HARD_BIN:
         Has legal values in the range 0 to 32767.
       SOFT_BIN:
@@ -1694,24 +1291,27 @@ class Prr(RecordType):
       * Shmoo Plot
       * Repair Data
     """
-    typ = 5
-    sub = 20
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('PART_FLG', 'B1', None),
-        ('NUM_TEST', 'U2', None),
-        ('HARD_BIN', 'U2', None),
-        ('SOFT_BIN', 'U2', 0xffff),
-        ('X_COORD',  'I2', -32768),
-        ('Y_COORD',  'I2', -32768),
-        ('TEST_T',   'U4', 0),
-        ('PART_ID',  'Cn', ''),
-        ('PART_TXT', 'Cn', ''),
-        ('PART_FIX', 'Bn', [])
-        )
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('PART_ID', None),
+        ('NUM_TEST', int),
+        ('PF_FLG', None),
+        ('HARD_BIN', int),
+        ('SOFT_BIN', int),
+        ('X_COORD', int),
+        ('Y_COORD', int),
+        ('RETEST', None),
+        ('ABRT_COD', None),
+        ('TEST_T', None),
+        ('PART_TXT', None),
+        ('PART_FIX', None),        # Was a Bn
+    )
+    def __init__(self):
+        RecordType.__init__(self, Prr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Tsr(RecordType):
     """
     **Test Synopsis Record (TSR)**
@@ -1727,9 +1327,6 @@ class Tsr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(10)
-      REC_SUB  U*1   Record sub-type (30)
       HEAD_NUM U*1   Test head number                         See note
       SITE_NUM U*1   Test site number
       TEST_TYP C*1   Test type                                space
@@ -1747,6 +1344,8 @@ class Tsr(RecordType):
       TST_SUMS R*4   Sum of test result values                OPT_FLAG bit 4 = 1
       TST_SQRS R*4   Sum of squares of test result values     OPT_FLAG bit 5 = 1
       ======== ===== ======================================== ====================
+
+    Sample: TSR:2|2|600|Leakage|P|413|92|3||DC_TESTS|0.005|0.1|7.2|1280.3|4329.5
 
     Notes on Specific Fields:
       HEAD_NUM:
@@ -1794,27 +1393,28 @@ class Tsr(RecordType):
       Wafer Map               Functional Histogram
       ======================  ======================
     """
-    typ = 10
-    sub = 30
-    fieldMap = (
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('TEST_TYP', 'C1', ' '),
-        ('TEST_NUM', 'U4', None),
-        ('EXEC_CNT', 'U4', 0xffffffff),
-        ('FAIL_CNT', 'U4', 0xffffffff),
-        ('ALRM_CNT', 'U4', 0xffffffff),
-        ('TEST_NAM', 'Cn', ''),
-        ('SEQ_NAME', 'Cn', ''),
-        ('TEST_LBL', 'Cn', ''),
-        ('OPT_FLAG', 'B1', BN),
-        ('TEST_TIM', 'R4', ('OPT_FLAG', B2)),
-        ('TEST_MIN', 'R4', ('OPT_FLAG', B0)),
-        ('TEST_MAX', 'R4', ('OPT_FLAG', B1)),
-        ('TST_SUMS', 'R4', ('OPT_FLAG', B4)),
-        ('TST_SQRS', 'R4', ('OPT_FLAG', B5))
-        )
-@registerMe
+    fieldTuple = (
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('TEST_NUM', int),
+        ('TEST_NAM', None),
+        ('TEST_TYP', None),
+        ('EXEC_CNT', int),
+        ('FAIL_CNT', int),
+        ('ALRM_CNT', int),
+        ('SEQ_NAME', None),
+        ('TEST_LBL', None),
+        ('TEST_TIM', float),
+        ('TEST_MIN', float),
+        ('TEST_MAX', float),
+        ('TST_SUMS', float),
+        ('TST_SQRS', float),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Tsr.fieldTuple)
+
+#**************************************************************************************************
+#**************************************************************************************************
 class Ptr(RecordType):
     """
     **Parametric Test Record (PTR)**
@@ -1830,9 +1430,6 @@ class Ptr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(15)
-      REC_SUB  U*1   Record sub-type (10)
       TEST_NUM U*4   Test number
       HEAD_NUM U*1   Test head number
       SITE_NUM U*1   Test site number
@@ -1848,12 +1445,14 @@ class Ptr(RecordType):
       LO_LIMIT R*4   Low test limit value                     OPT_FLAG bit 4or6=1
       HI_LIMIT R*4   High test limit value                    OPT_FLAG bit 5or7=1
       UNITS    C*n   Test units                               length byte = 0
-      C_RESFMT C*n   ANSI Cresultformatstring                 length byte = 0
+      C_RESFMT C*n   ANSI C result format string              length byte = 0
       C_LLMFMT C*n   ANSI C low limit format string           length byte = 0
       C_HLMFMT C*n   ANSI C high limit format string          length byte = 0
       LO_SPEC  R*4   Low specification limit value            OPT_FLAG bit 2 = 1
       HI_SPEC  R*4   High specification limit value           OPT_FLAG bit 3 = 1
       ======== ===== ======================================== ====================
+
+    Sample: PTR:23|2|1|997.3|F|AOH|Check 2nd layer|||A|-1.7|45.2| %9.4f|%7.2f|%7.2f|-1.75|45.25|3|3|4       # ATDF spec order
 
     Notes on Specific Fields:
 
@@ -2043,32 +1642,33 @@ class Ptr(RecordType):
       * Histogram
       * Wafer Map
     """
-    typ = 15
-    sub = 10
-    fieldMap = (
-        ('TEST_NUM', 'U4', None),
-        ('HEAD_NUM', 'U1', None),
-        ('SITE_NUM', 'U1', None),
-        ('TEST_FLG', 'B1', BN),
-        ('PARM_FLG', 'B1', None),
-        ('RESULT',   'R4', ('TEST_FLG', B1)),
-        ('TEST_TXT', 'Cn', ''),
-        ('ALARM_ID', 'Cn', ''),
-        ('OPT_FLAG', 'B1', BN),
-        ('RES_SCAL', 'I1', ('OPT_FLAG', B0)),
-        ('LLM_SCAL', 'I1', ('OPT_FLAG', B4 & B6)),
-        ('HLM_SCAL', 'I1', ('OPT_FLAG', B5 & B7)),
-        ('LO_LIMIT', 'R4', ('OPT_FLAG', B4 & B6)),
-        ('HI_LIMIT', 'R4', ('OPT_FLAG', B5 & B7)),
-        ('UNITS',    'Cn', ''),
-        ('C_RESFMT', 'Cn', ''),
-        ('C_LLMFMT', 'Cn', ''),
-        ('C_HLMFMT', 'Cn', ''),
-        ('LO_SPEC',  'R4', ('OPT_FLAG', B2)),
-        ('HI_SPEC',  'R4', ('OPT_FLAG', B3))
-        )
+    fieldTuple = (
+        ('TEST_NUM', int),
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('RESULT', float),
+        ('PF_FLG', None),
+        ('ALRM_FLG', None),
+        ('TEST_TXT', None),
+        ('ALARM_ID', None),
+        ('LIMT_CMP', None),
+        ('UNITS', None),
+        ('LO_LIMIT', float),
+        ('HI_LIMIT', float),
+        ('C_RESFMT', None),
+        ('C_LLMFMT', None),
+        ('C_HLMFMT', None),
+        ('LO_SPEC', float),
+        ('HI_SPEC', float),
+        ('RES_SCAL', int),
+        ('LLM_SCAL', int),
+        ('HLM_SCAL', int),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Ptr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Mpr(RecordType):
     """
     **Multiple-Result Parametric Record (MPR)**
@@ -2085,9 +1685,6 @@ class Mpr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(15)
-      REC_SUB  U*1   Record sub-type (15)
       TEST_NUM U*4   Test number
       HEAD_NUM U*1   Test head number
       SITE_NUM U*1   Test site number
@@ -2107,35 +1704,28 @@ class Mpr(RecordType):
       HI_LIMIT R*4   Test high limit value                    OPT_FLAG bit5or7=1
       START_IN R*4   Starting input value (condition)         OPT_FLAG bit 1 = 1
       INCR_IN  R*4   Increment of input condition             OPT_FLAG bit 1 = 1
-      RTN_INDX jxU*2 Array of PMR indexes                     RTN_ICNT = 0
+      RTN_INDX jxU*2 Array ofPMR indexes                      RTN_ICNT = 0
       UNITS    C*n   Units of returned results                length byte = 0
       UNITS_IN C*n   Input condition units                    length byte = 0
-      C_RESFMT C*n   ANSI C-result format string              length byte = 0
+      C_RESFMT C*n   ANSI Cresultformatstring                 length byte = 0
       C_LLMFMT C*n   ANSI C low limit format string           length byte = 0
       C_HLMFMT C*n   ANSI C high limit format string          length byte = 0
       LO_SPEC  R*4   Low specification limit value            OPT_FLAG bit 2 = 1
       HI_SPEC  R*4   High specification limit value           OPT_FLAG bit 3 = 1
       ======== ===== ======================================== ====================
 
+    MPR:143|2|4||001.3,0009.6,001.5|F|D|||LH|mA|001.0|002.0| 4.5|.1|V|3,4,5|%6.1f|%6.1f|%6.1f|0009.75|002.25
 
     Notes on Specific Fields:
       Default Data:
-        All data beginning with the OPT_FLAG field has a special function
-        in the STDF file. The first MPR for each test will have these fields
-        filled in. These values will be the default for each subsequent MPR
-        with the same test number: if a subsequent MPR has a value for one
-        of these fields, it will be used instead of the default, for that one
-        record only; if the field is blank, the default will be used.  If the
-        MPR is not associated with a test execution (that is, it contains only
-        default information), bit 4 of the TEST_FLG field must be set, and the
-        PARM_FLG field must be zero.  Unless the default is being overridden,
-        the default data fields should be omitted in order to save space in
-        the file.  Note that RES_SCAL, LLM_SCAL, HLM_SCAL, UNITS, C_RESFMT,
-        C_LLMFMT, and C_HLMFMT are interdependent. If you are overriding the
-        default value of one, make sure that you also make appropriate changes
-        to the others in order to keep them consistent.  For character strings,
-        you can override the default with a null value by setting the string
-        length to 1 and the string itself to a single binary 0.
+        All MPR data starting with the Test Units: field has a special function in the ATDF file. The
+        first MPR for each test will have these fields filled in. The values in these fields will be the
+        default values for each subsequent MPR with the same test number. If the field is filled in
+        for subsequent MPRs, that value will override the default. Otherwise the default will be used.
+        For character strings, it is possible to override the default with a null value by setting the
+        string to a single space.
+        Unless the default has been overridden, omit the default data fields to save space in the
+        ATDF file.
 
       TEST_NUM:
         The test number does not implicitly increment for successive values in
@@ -2146,7 +1736,7 @@ class Mpr(RecordType):
         standard way of identifying its single test site or head, these fields
         should be set to 1.
         When parallel testing, these fields are used to associate individual
-        datalogged results with a PIR/PRR pair. An MPR belongs to the PIR/PRR
+        data logged results with a PIR/PRR pair. An MPR belongs to the PIR/PRR
         pair having the same values for HEAD_NUM and SITE_NUM.
 
       TEST_FLG:
@@ -2307,39 +1897,38 @@ class Mpr(RecordType):
       * Datalog
       * Shmoo Plot
     """
-    typ = 15
-    sub = 15
-    fieldMap = (
-        ('TEST_NUM',   'U4', None),
-        ('HEAD_NUM',   'U1', None),
-        ('SITE_NUM',   'U1', None),
-        ('TEST_FLG',   'B1', None),
-        ('PARM_FLG',   'B1', None),
-        ('RTN_ICNT',   'U2', 0),
-        ('RSLT_CNT',   'U2', 0),
-        ('RTN_STAT', 'k5N1', []),
-        ('RTN_RSLT', 'k6R4', []),
-        ('TEST_TXT',   'Cn', ''),
-        ('ALARM_ID',   'Cn', ''),
-        ('OPT_FLAG',   'B1', BN),
-        ('RES_SCAL',   'I1', ('OPT_FLAG', B0)),
-        ('LLM_SCAL',   'I1', ('OPT_FLAG', B4 | B6)),
-        ('HLM_SCAL',   'I1', ('OPT_FLAG', B5 | B7)),
-        ('LO_LIMIT',   'R4', ('OPT_FLAG', B4 | B6)),
-        ('HI_LIMIT',   'R4', ('OPT_FLAG', B5 | B7)),
-        ('START_IN',   'R4', ('OPT_FLAG', B1)),
-        ('INCR_IN',    'R4', ('OPT_FLAG', B1)),
-        ('RTN_INDX', 'k5U2', ''),
-        ('UNITS',      'Cn', ''),
-        ('UNITS_IN',   'Cn', ''),
-        ('C_RESFMT',   'Cn', ''),
-        ('C_LLMFMT',   'Cn', ''),
-        ('C_HLMFMT',   'Cn', ''),
-        ('LO_SPEC',    'R4', ('OPT_FLAG', B2)),
-        ('HI_SPEC',    'R4', ('OPT_FLAG', B3))
-        )
+    fieldTuple = (
+        ('TEST_NUM', int),
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('RTN_STAT', xpr),
+        ('RTN_RSLT', fpr),
+        ('PF_FLAG', None),
+        ('ALRM_FLG', None),
+        ('TEST_TXT', None),
+        ('ALARM_ID', None),
+        ('LIMT_CMP', None),
+        ('UNITS', None),
+        ('LO_LIMIT', float),
+        ('HI_LIMIT', float),
+        ('START_IN', float),
+        ('INCR_IN', float),
+        ('UNITS_IN', None),
+        ('RTN_INDX', ipr),
+        ('C_RESFMT', None),
+        ('C_LLMFMT', None),
+        ('C_HLMFMT', None),
+        ('LO_SPEC', float),
+        ('HI_SPEC', float),
+        ('RES_SCAL', int),
+        ('LLM_SCAL', int),
+        ('HLM_SCAL', int),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Mpr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Ftr(RecordType):
     """
     **Functional Test Record (FTR)**
@@ -2355,9 +1944,6 @@ class Ftr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(15)
-      REC_SUB  U*1   Record sub-type (20)
       TEST_NUM U*4   Test number
       HEAD_NUM U*1   Test head number
       SITE_NUM U*1   Test site number
@@ -2366,7 +1952,7 @@ class Ftr(RecordType):
       CYCL_CNT U*4   Cycle count of vector                    OPT_FLAG bit0 = 1
       REL_VADR U*4   Relative vector address                  OPT_FLAG bit1 = 1
       REPT_CNT U*4   Repeat count of vector                   OPT_FLAG bit2 = 1
-      NUM_FAIL U*4   Number of pins with 1 or more failures   OPT_FLAG bit3 = 1
+      NUM_FAIL U*4   Number of pins with 1 or more failures   OPT_FL            # TEST_NUM AG bit3 = 1
       XFAIL_AD I*4   X logical device failure address         OPT_FLAG bit4 = 1
       YFAIL_AD I*4   Y logical device failure address         OPT_FLAG bit4 = 1
       VECT_OFF I*2   Offset from vector of interest           OPT_FLAG bit5 = 1
@@ -2388,17 +1974,16 @@ class Ftr(RecordType):
       SPIN_MAP D*n   Bit map of enabled comparators           length byte = 0
       ======== ===== ======================================== ====================
 
+    Sample: FTR:27|2|1|P||CHECKERBOARD|A1|5|16|2|3|6|3|0|10,2,8,12|0,1,1,4|4,5,6,7|0,0,0,0|8|DRV|Check Driver||||2|2,3,4,6
+
     Notes on Specific Fields:
       Default Data:
-        All data starting with the PATG_NUM field has a special function in
-        the STDF file. The first FTR for each test will have these fields
-        filled in. These values will be the default for each subsequent FTR
-        with the same test number. If a subsequent FTR has a value for one of
-        these fields, it will be used instead of the default, for that one
-        record only. If the field is blank, the default will be used. This
-        method replaces use of the FDR in STDF V3.  Unless the default is
-        being overridden, the default data fields should be omitted in order
-        to save space in the file.
+        All FTR data starting with the Generator Num: field has a special function in the ATDF file.
+        The first FTR for each test will have these fields filled in. The values in these fields will be
+        the default values for each subsequent FTR with the same test number. If the field is filled
+        in for subsequent FTRs, that value will override the default. Otherwise the default will be
+        used. Unless the default has been overridden, omit the default data fields to save space in the
+        ATDF file.
 
       HEAD_NUM, SITE_NUM:
         If a test system does not support parallel testing, and does not
@@ -2588,198 +2173,39 @@ class Ftr(RecordType):
       * Functional Histogram
       * Functional Failure Analyzer
     """
-    typ = 15
-    sub = 20
-    fieldMap = (
-        ('TEST_NUM',    'U4', None),
-        ('HEAD_NUM',    'U1', None),
-        ('SITE_NUM',    'U1', None),
-        ('TEST_FLG',    'B1', None),
-        ('OPT_FLAG',    'B1', BN),
-        ('CYCL_CNT',    'U4', ("OPT_FLAG", B0)),
-        ('REL_VADR',    'U4', ("OPT_FLAG", B1)),
-        ('REPT_CNT',    'U4', ("OPT_FLAG", B2)),
-        ('NUM_FAIL',    'U4', ("OPT_FLAG", B3)),
-        ('XFAIL_AD',    'I4', ("OPT_FLAG", B4)),
-        ('YFAIL_AD',    'I4', ("OPT_FLAG", B4)),
-        ('VECT_OFF',    'I2', ("OPT_FLAG", B5)),
-        ('RTN_ICNT',    'U2', 0),
-        ('PGM_ICNT',    'U2', 0),
-        ('RTN_INDX', 'k12U2', []),
-        ('RTN_STAT', 'k12N1', []),
-        ('PGM_INDX', 'k13U2', []),
-        ('PGM_STAT', 'k13N1', []),
-        ('FAIL_PIN',    'Dn', []),
-        ('VECT_NAM',    'Cn', ''),
-        ('TIME_SET',    'Cn', ''),
-        ('OP_CODE',     'Cn', ''),
-        ('TEST_TXT',    'Cn', ''),
-        ('ALARM_ID',    'Cn', ''),
-        ('PROG_TXT',    'Cn', ''),
-        ('RSLT_TXT',    'Cn', ''),
-        ('PATG_NUM',    'U1', 0xff),
-        ('SPIN_MAP',    'Dn', []),
-        )
-
-@registerMe
-class Str(RecordType):
-    """
-    **Scan Test Record (STR)**
-
-    Function:
-        Scan Test Record (STR) is a new record that is added to the major record type
-        15 category (Data Collected Per Test Execution). This is the same category
-        where functional and parametric fail records exist. Thus the scan test record
-        becomes another test record type in this category.
-        It contains all or some of the results of the single execution of a scan test in
-        the test program. It is intended to contain all of the individual pin/cycle
-        failures that are detected in a single test execution. If there are more failures
-        than can be contained in a single record, then the record may be followed by
-        additional continuation STR records.
-        In this new record some fields have been brought over from the functional test
-        record and some new fields have been added to handle the scan test data.
-
-    Data Fields:
-        ======== ===== ======================================== ====================
-        Name     Type  Description                              Missing/Invalid Flag
-        ======== ===== ======================================== ====================
-        CONT_FLG B*1   Continuation STR follows if not 0
-        TEST_NUM U*4   Test number
-        HEAD_NUM U*1   Test head number
-        SITE_NUM U*1   Test site number
-        PSR_REF  U*2   PSR Index (Pattern Sequence Record)
-        TEST_FLG B*1   Test flags (fail, alarm, etc.)
-        LOG_TYP  C*n   User defined description of datalog      length byte = 0
-        TEST_TXT C*n   Descriptive text or label                length byte = 0
-        ALARM_ID C*n   Name of alarm                            length byte = 0
-        PROG_TXT C*n   Additional Programmed information        length byte = 0
-        RSLT_TXT C*n   Additional result information            length byte = 0
-        Z_VAL    U*1   Z Handling Flag
-        FMU_FLG  B*1   MASK_MAP & FAL_MAP field status & Pattern Changed flag
-        MASK_MAP D*n   Bit map of Globally Masked Pins          FMU_FLG bit 0 = 0 OR bit1 = 1
-        FAL_MAP  D*n   Bit map of failures after buffer full    FMU_FLG bit 2 = 0 OR bit3 = 1
-        CYC_CNT  U*8   Total cycles executed in test
-        TOTF_CNT U*4   Total failures (pin x cycle) detected in test execution
-        TOTL_CNT U*4   Total fails logged across the complete STR data set
-        CYC_BASE U*8   Cycle offset to apply for the values in the CYCL_OFST array
-        BIT_BASE U*4   Offset to apply for the values in the BIT_POS array
-        COND_CNT U*2   Count (g) of Test Conditions and optional data specifications in present record
-        LIM_CNT  U*2   Count (j) of LIM Arrays in present record, 1 for global specification
-        CYC_SIZE U*1   Size (f) of data (1,2,4, or 8 byes) in CYC_OFST field        0
-        PMR_SIZE U*1   Size (f) of data (1 or 2 bytes) in PMR_INDX field            0
-        CHN_SIZE U*1   Size (f) of data (1, 2 or 4 bytes) in CHN_NUM field          0
-        PAT_SIZE U*1   Size (f) of data (1,2, or 4 bytes) in PAT_NUM field          0
-        BIT_SIZE U*1   Size (f) of data (1,2, or 4 bytes) in BIT_POS field          0
-        U1_SIZE  U*1   Size (f) of data (1,2,4 or 8 bytes) in USR1 field            0
-        U2_SIZE  U*1   Size (f) of data (1,2,4 or 8 bytes) in USR2 field            0
-        U3_SIZE  U*1   Size (f) of data (1,2,4 or 8 bytes) in USR3 field            0
-        UTX_SIZE U*1   Size (f) of each string entry in USER_TXT array              0
-        CAP_BGN  U*2   Offset added to BIT_POS value to indicate capture cycles
-        LIM_INDX jxU*2 Array of PMR indexes that require unique limit specs         LIM_CNT=0
-        LIM_SPEC jxU*4 Array of fail limits for the PMRs listed in LIM_INDX         LIM_CNT=0
-        COND_LST gxC*n Array of test condition (Name=value) pairs                   COND_CNT=0
-        CYCO_CNT U*2   Count (k) of entries in CYC_OFST array                       0
-        CYC_OFST kxU*f Array of cycle numbers relative to CYC_BASE                  CYCO_CNT=0
-        PMR_CNT  U*2   Count (k) of entries in the PMR_INDX array                   0
-        PMR_INDX kxU*f Array of PMR Indexes (All Formats)                           PMR_CNT=0
-        CHN_CNT  U*2   Count (k) of entries in the CHN_NUM array                    0
-        CHN_NUM  kxU*f Array of Chain No for FF Name Mapping                        CHN_CNT=0
-        EXP_CNT  U*2   Count (k) of EXP_DATA array entries                          0
-        EXP_DATA mxU*1 Array of expected vector data                                EXP_CNT=0
-        CAP_CNT  U*2   Count (k) of CAP_DATA array entries                          0
-        CAP_DATA kxU*1 Array of captured data                                       CAP_CNT=0
-        NEW_CNT  U*2   Count (k) of NEW_DATA array entries                          0
-        NEW_DATA kxU*1 Array of new vector data                                     NEW_CNT=0
-        PAT_CNT  U*2   Count (k) of PAT_NUM array entries                           0
-        PAT_NUM  kxU*f Array of pattern # (Ptn/Chn/Bit format)                      PAT_CNT=0
-        BPOS_CNT U*2   Count (k) of BIT_POS array entries                           0
-        BIT_POS  kxU*f Array of chain bit positions (Ptn/Chn/Bit format)            BPOS_CNT=0
-        USR1_CNT U*2   Count (k) of USR1 array entries                              0
-        USR1     kxU*f Array of user defined data for each logged fail              USR1_CNT=0
-        USR2_CNT U*2   Count (k) of USR2 array entries                              0
-        USR2     kxU*f Array of user defined data for each logged fail              USR2_CNT=0
-        USR3_CNT U*2   Count (k) of USR3 array entries                              0
-        USR3     kxU*f Array of user defined data for each logged fail              USR3_CNT=0
-        TXT_CNT  U*2   Count (k) of USER_TXT array entries                          0
-        USER_TXT kxC*f Array of user defined Cf strings for each logged fail        TXT_CNT=0
-        ======== ===== ======================================== ====================
-    """
-    typ = 15
-    sub = 30
-    fieldMap = (
-        ('CONT_FLG',    'B1', None),
-        ('TEST_NUM',    'U4', None),
-        ('HEAD_NUM',    'U1', None),
-        ('SITE_NUM',    'U1', None),
-        ('PSR_REF',     'U2', None),
-        ('TEST_FLG',    'B1', None),
-        ('LOG_TYP',     'Cn', ''),
-        ('TEST_TXT',    'Cn', ''),
-        ('ALARM_ID',    'Cn', ''),
-        ('PROG_TXT',    'Cn', ''),
-        ('RSLT_TXT',    'Cn', ''),
-        ('Z_VAL',       'U1', None),
-        ('FMU_FLG',     'B1', BN),
-        ('MASK_MAP',    'Dn', ('FMU_FLG', B0 | B1)),
-        ('FAL_MAP',     'Dn', ('FMU_FLG', B2 | B3)),
-        ('CYC_CNT',     'U8', None),
-        ('TOTF_CNT',    'U4', None),
-        ('TOTL_CNT',    'U4', None),
-        ('CYC_BASE',    'U8', None),
-        ('BIT_BASE',    'U4', None),
-        ('COND_CNT',    'U2', None),
-        ('LIM_CNT',     'U2', None),
-        ('CYC_SIZE',    'U1', 0),
-        ('PMR_SIZE',    'U1', 0),
-        ('CHN_SIZE',    'U1', 0),
-        ('PAT_SIZE',    'U1', 0),
-        ('BIT_SIZE',    'U1', 0),
-        ('U1_SIZE',     'U1', 0),
-        ('U2_SIZE',     'U1', 0),
-        ('U3_SIZE',     'U1', 0),
-        ('UTX_SIZE',    'U1', 0),
-        ('CAP_BGN',     'U2', None),
-        ('LIM_INDX', 'k21U2', []),
-        ('LIM_SPEC', 'k21U4', []),
-        ('COND_LST', 'k20Cn', []),
-        ('CYCO_CNT',    'U2', 0),
-        ('CYC_OFST', 'k35Uf', []),
-        ('PMR_CNT',     'U2', 0),
-        ('PMR_INDX', 'k37Uf', []),
-        ('CHN_CNT',     'U2', 0),
-        ('CHN_NUM',  'k39Uf', []),
-        ('EXP_CNT',     'U2', 0),
-        ('EXP_DATA', 'k41U1', []),
-        ('CAP_CNT',     'U2', 0),
-        ('CAP_DATA', 'k43U1', []),
-        ('NEW_CNT',     'U2', 0),
-        ('NEW_DATA', 'k45U1', []),
-        ('PAT_CNT',     'U2', 0),
-        ('PAT_NUM',  'k47Uf', []),
-        ('BPOS_CNT',    'U2', 0),
-        ('BIT_POS',  'k49Uf', []),
-        ('USR1_CNT',    'U2', 0),
-        ('USR1',     'k51Uf', []),
-        ('USR2_CNT',    'U2', 0),
-        ('USR2',     'k53Uf', []),
-        ('USR3_CNT',    'U2', 0),
-        ('USR3',     'k55Uf', []),
-        ('TXT_CNT',     'U2', 0),
-        ('USER_TXT', 'k57Cf', []),
+    fieldTuple = (
+        ('TEST_NUM', int),
+        ('HEAD_NUM', int),
+        ('SITE_NUM', int),
+        ('PF_FLAG', None),
+        ('ALRM_FLG', None),
+        ('VECT_NAM', None),
+        ('TIME_SET', None),
+        ('CYCL_CNT', int),
+        ('REL_VADR', int),
+        ('REPT_CNT', int),
+        ('NUM_FAIL', int),
+        ('XFAIL_AD', int),
+        ('YFAIL_AD', int),
+        ('VECT_OFF', int),
+        ('RTN_INDX', ipr),
+        ('RTN_STAT', xpr),
+        ('PGM_INDX', ipr),
+        ('PGM_STAT', xpr),
+        ('FAIL_PIN', None),       # Was a Dn
+        ('OP_CODE', None),
+        ('TEST_TXT', None),
+        ('ALARM_ID', None),
+        ('PROG_TXT', None),
+        ('RSLT_TXT', None),
+        ('PATG_NUM', int),
+        ('SPIN_MAP', None),       # Was a Dn
     )
-    sizeMap = {
-        'CYC_OFST': 'CYC_SIZE',
-        'PMR_INDX': 'PMR_SIZE',
-        'CHN_NUM':  'CHN_SIZE',
-        'PAT_NUM':  'PAT_SIZE',
-        'BIT_POS':  'BIT_SIZE',
-        'USR1':     'U1_SIZE',
-        'USR2':     'U2_SIZE',
-        'USR3':     'U3_SIZE',
-        'USER_TXT': 'UTX_SIZE',
-    }
+    def __init__(self):
+        RecordType.__init__(self, Ftr.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Bps(RecordType):
     """
     **Begin Program Section Record (BPS)**
@@ -2792,11 +2218,10 @@ class Bps(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(20)
-      REC_SUB  U*1   Record sub-type (10)
       SEQ_NAME C*n   Program section (or sequencer) name      length byte = 0
       ======== ===== ======================================== ====================
+
+    Sample: BPS:DC_TESTS
 
     Frequency:
       Optional on each entry into the program segment.
@@ -2807,13 +2232,14 @@ class Bps(RecordType):
     Possible Use:
       When performing analyses on a particular program segment's test.
     """
-    typ = 20
-    sub = 10
-    fieldMap = (
-        ('SEQ_NAME', 'Cn', ''),
-        )
+    fieldTuple = (
+        ('SEQ_NAME', None),
+    )
+    def __init__(self):
+        RecordType.__init__(self, Bps.fieldTuple)
 
-@registerMe
+#**************************************************************************************************
+#**************************************************************************************************
 class Eps(RecordType):
     """
     **End Program Section Record (EPS)**
@@ -2826,10 +2252,9 @@ class Eps(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(20)
-      REC_SUB  U*1   Record sub-type (20)
       ======== ===== ======================================== ====================
+
+    Sample: EPS:
 
     Frequency:
       Optional on each exit from the program segment.
@@ -2852,11 +2277,13 @@ class Eps(RecordType):
       Because an EPS record does not contain the name of the sequencer, it should
       be assumed that each EPS record matches the last unmatched BPS record.
     """
-    typ = 20
-    sub = 20
-    fieldMap = ()
+    fieldTuple = ()
 
-@registerMe
+    def __init__(self):
+        RecordType.__init__(self, Eps.fieldTuple)
+
+#**************************************************************************************************
+#**************************************************************************************************
 class Gdr(RecordType):
     """
     **Generic Data Record (GDR)**
@@ -2871,90 +2298,39 @@ class Gdr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(50)
-      REC_SUB  U*1   Record sub-type (20)
-      FLD_CNT  U*2   Count of data fields in record
       GEN_DATA V*n   Data type code and data for one field
-                     (Repeat GEN_DATA foreach datafield)
+                     (Repeat GEN_DATA for each data field)
       ======== ===== ======================================== ====================
+
+    Sample: GDR:TThis is text|L-435|U255|F645.7110|XFFE0014C
 
     Notes on Specific Fields:
       GEN_DATA:
-        Is repeated FLD_CNT number of times. Each GEN_DATA field consists of
+        Is repeated some number of times. Each GEN_DATA field consists of
         a data type code followed by the actual data. The data type code is
         the first unsigned byte of the field.
         Valid data types are:
+            The first character of the field is the format
+            character and will indicate how the ASCII text to
+            follow should be treated. This field may be
+            repeated as many times as desired. Legal values
+            for the first character are:
+            U = U*1 - One byte unsigned integer.
+            M = U*2 - Two byte unsigned integer.
+            B = U*4 - Four byte unsigned integer.
+            I = I*1 - One byte signed integer.
+            S = I*2 - Two byte signed integer.
+            L = I*4 - Four byte signed integer.
+            F = R*4 - Four byte floating point number.
+            D = R*8 - Eight byte floating point number.
+            T = C*n - Variable length ASCII string.
+            X = B*n - Variable length binary data (in hexadecimal). Max length is 255 bytes.
+            Y = D*n - Variable length binary data (in hexadecimal). Max length is 65535 bits.
+            N = N*1 - Unsigned nibble.
 
-          * 0  = B*0  Special pad field, of length 0 (See note below)
-          * 1  = U*1  One byte unsigned integer
-          * 2  = U*2  Two byte unsigned integer
-          * 3  = U*4  Four byte unsigned integer
-          * 4  = I*1  One byte signed integer
-          * 5  = I*2  Two byte signed integer
-          * 6  = I*4  Four byte signed integer
-          * 7  = R*4  Four byte floating point number
-          * 8  = R*8  Eight byte floating point number
-          * 10 = C*n  Variable length ASCII character string
-            (first byte is string length in bytes)
-          * 11 = B*n  Variable length binary data string
-            (first byte is string length in bytes)
-          * 12 = D*n  Bit encoded data
-            (first two bytes of string are length in bits)
-          * 13 = N*1  Unsigned nibble
-
-      Pad Field (Data Type 0):
-        Data type 0, the special pad field, is used to force alignment of
-        following data types in the record. In particular, it must be used
-        to ensure even byte alignment of U*2, U*4, I*2, I*4, R*4,and R*8
-        data types.
-        The GDR is guaranteed to begin on an even byte boundary. The GDR
-        header contains four bytes. The first GEN_DATA field therefore begins
-        on an even byte boundary. It is the responsibility of the designer of
-        a GDR record to provide the pad bytes needed to ensure data boundary
-        alignment for the CPU on which it will run.
-
-      Example:
-        The following table describes a sample GDR that contains three data
-        fields of different data types. The assumption is that numeric data
-        of more than one byte must begin on an even boundary. Pad bytes will
-        be used to meet this requirement.
-
-        ==== ==== ===============================================================
-        Data Code Alignment Requirement
-        ==== ==== ===============================================================
-        "AB" 10   A variable-length character string can begin on
-                  any byte. This field will contain one data byte, one
-                  length byte, and two data bytes, for a total length of
-                  4 bytes. Because this field begins on an even byte, the
-                  next field also begins on an even byte.
-        255  1    A one-byte numeric value can begin on any byte. This field
-                  contains two bytes, so the next field also begins on an
-                  even byte.
-        510  5    A two-byte numeric value must begin on an even byte. This
-                  GEN_DATA field would begin on an even byte and,because
-                  the first byte is the data code, the actual numeric value
-                  would begin on an odd byte. This field must therefore be
-                  preceded by a pad byte.
-        ==== ==== ===============================================================
-
-        The byte representation for this GDR is as follows. The byte ordering
-        shown here is for sample purposes only. The actual data representation
-        differs between CPUs. The byte values are shown in hexadecimal. The
-        decimal equivalents are given in the description of the bytes.
-
-        ========= ======== ==============================================
-        Even Byte Odd Byte Description (with Decimal Values)
-        ========= ======== ==============================================
-        0c        00       Number of bytes following the header (12)
-        32        0a       Record type (50); record subtype (10)
-        04        00       Number of data fields (4)
-        0a        02       Character string: code (10) and length (2)
-        41        42       Character string: data bytes (*A* and *B*)
-        01        ff       1-byte integer: code (1) and data (255 = 0xff)
-        00        05       Padbyte(0); code(5) fornextfield
-        fe        01       2-byte signed integer (510 = 0x01fe)
-        ========= ======== ==============================================
+      Note on Pad Bytes:
+        No pad byte is defined because byte alignment is not a problem in the ATDF format. Pad
+        bytes are inserted as necessary on conversion to STDF.
 
     Frequency:
       A test data file may contain any number of GDR's.
@@ -2965,13 +2341,15 @@ class Gdr(RecordType):
     Possible Use:
       User-written reports
     """
-    typ = 50
-    sub = 10
-    fieldMap = (
-        ('GEN_DATA', 'Vn', None),
+    fieldTuple = (
+        ('GEN_DATA', vpr),
         )
 
-@registerMe
+    def __init__(self):
+        RecordType.__init__(self, Gdr.fieldTuple)
+
+#**************************************************************************************************
+#**************************************************************************************************
 class Dtr(RecordType):
     """
     **Datalog Text Record (DTR)**
@@ -2988,11 +2366,10 @@ class Dtr(RecordType):
       ======== ===== ======================================== ====================
       Name     Type  Description                              Missing/Invalid Flag
       ======== ===== ======================================== ====================
-      REC_LEN  U*2   Bytes of data following header
-      REC_TYP  U*1   Record type(50)
-      REC_SUB  U*1   Record sub-type (30)
       TEXT_DAT C*n   ASCII text string
       ======== ===== ======================================== ====================
+
+    Sample: DTR:Datalog sampling rate is now 1 in 10
 
     Frequency:
       A test data file may contain any number of DTR's.
@@ -3003,14 +2380,63 @@ class Dtr(RecordType):
     Possible Use:
       * Datalog
     """
-    typ = 50
-    sub = 30
-    fieldMap = (
-        ('TEXT_DAT', 'Cn', None),
+    fieldTuple = (
+        ('TEXT_DAT', None),
         )
 
+    def __init__(self):
+        RecordType.__init__(self, Dtr.fieldTuple)
 
-if __name__ == '__main__':
-    for key, recType in sorted(RecordRegistrar.items()):
-        if isinstance(key, tuple):
-            print repr(recType())
+far = Far()
+atr = Atr()
+mir = Mir()
+mrr = Mrr()
+pcr = Pcr()
+hbr = Hbr()
+sbr = Sbr()
+pmr = Pmr()
+pgr = Pgr()
+plr = Plr()
+rdr = Rdr()
+sdr = Sdr()
+wir = Wir()
+wrr = Wrr()
+wcr = Wcr()
+pir = Pir()
+prr = Prr()
+tsr = Tsr()
+ptr = Ptr()
+mpr = Mpr()
+ftr = Ftr()
+bps = Bps()
+eps = Eps()
+gdr = Gdr()
+dtr = Dtr()
+
+records = (
+    far,
+    atr,
+    mir,
+    mrr,
+    pcr,
+    hbr,
+    sbr,
+    pmr,
+    pgr,
+    plr,
+    rdr,
+    sdr,
+    wir,
+    wrr,
+    wcr,
+    pir,
+    prr,
+    tsr,
+    ptr,
+    mpr,
+    ftr,
+    bps,
+    eps,
+    gdr,
+    dtr
+    )

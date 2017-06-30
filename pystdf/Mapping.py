@@ -17,64 +17,61 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-from pystdf.Types import *
-from pystdf.Indexing import *
-from pystdf import V4
+from Indexing import StreamIndexer, MaterialIndexer
+import V4
 
 class StreamMapper(StreamIndexer):
-
-    def __init__(self, types=V4.records):
+    def __init__(self):
         self.indexes = []
-        self.types = []
-        self.__rec_map = dict([((recType.typ, recType.sub), recType)
-                                for recType in types])
+        self.records = []
 
     def before_header(self, dataSource, header):
-        StreamIndexer.before_header(self, dataSource, header)
+        super(StreamMapper, self).before_header(dataSource, header)
         self.indexes.append(self.position)
-        key = (self.header.typ, self.header.sub)
-        rectype = self.__rec_map.get(key, UnknownRecord(*key))
-        self.types.append(rectype)
+        rec = V4.recordByType(self.header.typ, self.header.sub)
+        self.records.append(rec)
 
 class MaterialMapper(MaterialIndexer):
-    indexable_types = set([V4.wir, V4.wrr, V4.pir, V4.prr, V4.ptr, V4.mpr, V4.ftr])
-    per_part_types = set([V4.pir, V4.prr, V4.ptr, V4.mpr, V4.ftr])
+    indexed = {'Wir', 'Wrr', 'Pir', 'Prr', 'Ptr', 'Mpr', 'Ftr'}
+    perPart = {'Pir', 'Prr', 'Ptr', 'Mpr', 'Ftr'}
 
     def before_begin(self, dataSource):
         MaterialIndexer.before_begin(self, dataSource)
-        self.waferid = []
-        self.insertionid = []
-        self.partid = []
+        self.waferIds = []
+        self.insertionIds = []
+        self.partIds = []
 
-    def before_send(self, dataSource, data):
-        MaterialIndexer.before_send(self, dataSource, data)
-        rectype, rec = data
-        if rectype in self.indexable_types:
-            head = rec[rectype.HEAD_NUM]
-            self.waferid.append(self.getCurrentWafer(head))
-            self.insertionid.append(self.getCurrentInsertion(head))
-            if rectype in self.per_part_types:
-                site = rec[rectype.SITE_NUM]
-                self.partid.append(self.getCurrentPart(head, site))
+    def before_send(self, dataSource, record):
+        MaterialIndexer.before_send(self, dataSource, record)
+        if record.name in self.indexed:
+            head = record.values[record.HEAD_NUM]
+            self.waferIds.append(self.getCurrentWafer(head))
+            self.insertionIds.append(self.getCurrentInsertion(head))
+            if record.name in self.perPart:
+                site = record.values[record.SITE_NUM]
+                self.partIds.append(self.getCurrentPart(head, site))
             else:
-                self.partid.append(None)
+                self.partIds.append(None)
         else:
-            self.waferid.append(None)
-            self.insertionid.append(None)
-            self.partid.append(None)
+            self.waferIds.append(None)
+            self.insertionIds.append(None)
+            self.partIds.append(None)
 
-if __name__ == '__main__':
-    from pystdf.IO import Parser
-    from pystdf.Writers import AtdfWriter
-    import pystdf.V4
-
-    filename, = sys.argv[1:]
-    f = open(filename, 'rb')
-    p=Parser(inp=f)
+#*******************************************************************************************************************
+if __name__ == "__main__":
+    from Parse import process_file
+    import sys
+    fn = r'../data/lot3.stdf'
+    #fn = r'/path/to/log.stdf.gz'
+    filename, = sys.argv[1:] or (fn,)
     record_mapper = StreamMapper()
-    p.addSink(record_mapper)
-    p.parse()
-    f.close()
-
-    for index, rectype in zip(record_mapper.indexes, record_mapper.types):
-        print(index, rectype)
+    material_mapper = MaterialMapper()
+    process_file(filename, [record_mapper, material_mapper], breakCount=20)
+    for index, rectype in zip(record_mapper.indexes, record_mapper.records):
+        print index, str(rectype)
+    for index, waferId in enumerate(material_mapper.waferIds):
+        print index, waferId
+    for index, insId in enumerate(material_mapper.insertionIds):
+        print index, insId
+    for index, partId in enumerate(material_mapper.partIds):
+        print index, partId

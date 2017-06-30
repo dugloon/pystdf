@@ -16,10 +16,3 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
-
-from pystdf.TableTemplate import TableTemplate
-
-from pystdf.BinSummarizer import BinSummarizer
-from pystdf.ParametricSummarizer import ParametricSummarizer
-from pystdf.PartSummarizer import PartSummarizer
-from pystdf.Indexing import *

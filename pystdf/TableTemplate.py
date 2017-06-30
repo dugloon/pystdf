@@ -25,5 +25,6 @@ class TableTemplate(object):
             self.name = name
         self.columnNames = columnNames
         self.columnTypes = columnTypes
+        self.columnCount = len(columnNames)
 
 

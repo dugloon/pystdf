@@ -17,26 +17,32 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-from pystdf import Pipeline
-from pystdf.SummaryStatistics import SummaryStatistics
-from pystdf.V4 import prr, pcr
+import Pipeline
+import V4
+
 
 def filterNull(value):
     if value == 4294967295:
         return None
     return value
-    
+
+
 class PartSummarizer(Pipeline.EventSource):
-    
     FLAG_SYNTH = 0x80
     FLAG_FAIL = 0x08
     FLAG_UNKNOWN = 0x02
     FLAG_OVERALL = 0x01
     
     def __init__(self):
-        EventSource.__init__(self, ['partSummaryReady'])
+        self.prr = V4.Prr()
+        self.pcr = V4.Pcr()
+        Pipeline.EventSource.__init__(self, ['partSummaryReady'])
     
-    def partSummaryReady(self, dataSource): pass
+    def partSummaryReady(self, _):
+        print '---------- Part Summary ----------'
+        print self.overall
+        for k, v in self.pcSummary.items():
+            print k, v
     
     def getOverall(self):
         return self.overall
@@ -46,9 +52,8 @@ class PartSummarizer(Pipeline.EventSource):
     
     def getSiteSynthCounts(self):
         for site, info in self.pcSynth.iteritems():
-            partCnt, goodCnt, abrtCnt = info
-            yield [0, site, partCnt[0], None, 
-                abrtCnt[0], goodCnt[0], None]
+            partCnt, goodCnt, abortCnt = info
+            yield [0, site, partCnt[0], None, abortCnt[0], goodCnt[0], None]
     
     def synthOverall(self):
         result = None
@@ -57,14 +62,14 @@ class PartSummarizer(Pipeline.EventSource):
                 result = [value for value in row]
             else:
                 for i, value in enumerate(row):
-                    if i > pcr.SITE_NUM and row[i] is not None:
+                    if i > self.pcr.SITE_NUM and row[i] is not None:
                         if result[i] is None:
                             result[i] = row[i]
                         else:
                             result[i] += row[i]
         return result
     
-    def before_begin(self, dataSource):
+    def before_begin(self, _):
         self.pcSynth = dict()
         self.pcSummary = dict()
         self.overall = None
@@ -72,27 +77,32 @@ class PartSummarizer(Pipeline.EventSource):
     def before_complete(self, dataSource):
         self.partSummaryReady(dataSource)
     
-    def before_send(self, dataSource, data):
-        table, row = data
-        if table.name == prr.name:
-            self.onPrr(row)
-        elif table.name == pcr.name:
-            self.onPcr(row)
+    def before_send(self, _, record):
+        if record.name == self.prr.name:
+            self.onPrr(record.values)
+        elif record.name == self.pcr.name:
+            self.onPcr(record.values)
     
     def onPrr(self, row):
-        partCnt, goodCnt, abrtCnt = self.pcSynth.setdefault(row[prr.SITE_NUM], 
-          ([0], [0], [0]))
+        partCnt, goodCnt, abortCnt = self.pcSynth.setdefault(row[self.prr.SITE_NUM], ([0], [0], [0]))
         partCnt[0] += 1
-        if row[prr.PART_FLG] & 0x08 == 0:
+        if row[self.prr.PART_FLG] & 0x08 == 0:
             goodCnt[0] += 1
-        if row[prr.PART_FLG] & 0x04 == 0:
-            abrtCnt[0] += 1
+        if row[self.prr.PART_FLG] & 0x04 == 0:
+            abortCnt[0] += 1
     
     def onPcr(self, row):
-        if row[pcr.HEAD_NUM] == 255:
-            self.overall = [
-                filterNull(value) for value in row]
+        if row[self.pcr.HEAD_NUM] == 255:
+            self.overall = [filterNull(value) for value in row]
         else:
-            self.pcSummary[row[pcr.SITE_NUM]] = [
-                filterNull(value) for value in row]
-    
+            self.pcSummary[row[self.pcr.SITE_NUM]] = [filterNull(value) for value in row]
+
+
+# *******************************************************************************************************************
+if __name__ == "__main__":
+    from Parse import process_file
+    import sys
+    fn = r'../data/lot3.stdf'
+    filename, = sys.argv[1:] or (fn,)
+    ps = PartSummarizer()
+    process_file(filename, [ps], breakCount=200)

@@ -18,7 +18,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-import sys
 from distutils.core import setup
 
 setup(name='pystdf',
@@ -44,7 +43,7 @@ PySTDF is released under a GPL license. Applications developed with PySTDF can o
     author='Casey Marshall',
     author_email='casey.marshall@gmail.com',
     url='http://code.google.com/p/pystdf/',
-    packages=['pystdf','pystdf.explorer'],
+    packages=['pystdf','pystdf.explorer', 'pyatdf'],
     scripts=['scripts/stdf_slice', 'scripts/rec_index', 'scripts/stdf2atdf', 
              'scripts/stdf2xml'],
     classifiers=[

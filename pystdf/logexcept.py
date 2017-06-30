@@ -46,8 +46,8 @@
 #
 ################################################################################
 
-__all__ = [ "exc_string", "trace_string", "force_string", 
-            "get_exc_string_encoding", "set_exc_string_encoding" ]
+__all__ = ["exc_string", "trace_string", "force_string",
+           "get_exc_string_encoding", "set_exc_string_encoding"]
 
 ###############################################################################
 
@@ -62,13 +62,14 @@ exc_string_encoding = "windows-1251"
 def get_exc_string_encoding():
     return exc_string_encoding
 
+
 def set_exc_string_encoding(encoding):
     global exc_string_encoding
     exc_string_encoding = encoding
 
 ###############################################################################
 
-force_string_translate_map = " ????????\t ?? ??????????????????" + "".join([ chr(i) for i in range(32, 256) ])
+force_string_translate_map = " ????????\t ?? ??????????????????" + "".join([chr(i) for i in range(32, 256)])
 
 def force_string(v):
     if isinstance(v, str):
@@ -92,16 +93,15 @@ def _reversed(r):
     result.reverse()
     return result
 
-def trace_string(tb = None):
-    return " <- ".join([ force_string("%s() (%s:%s)" % (m, path.split(f)[1], n))
-                         for f, n, m, u in _reversed(tb or extract_stack()[:-1]) ])
-                         
+
+def trace_string(tb=None):
+    return " <- ".join([force_string("%s() (%s:%s)" % (m, path.split(f)[1], n))
+                        for f, n, m, u in _reversed(tb or extract_stack()[:-1])])
+
 ###############################################################################
 
 def exc_string():
-
     try:
-
         t, v, tb = exc_info()
         if t is None:
             return "no exception"

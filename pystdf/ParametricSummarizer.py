@@ -17,45 +17,56 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-from pystdf.SummaryStatistics import SummaryStatistics
-from pystdf.V4 import ptr, mpr
-from pystdf.Pipeline import EventSource
+from SummaryStatistics import SummaryStatistics
+import V4
+from Pipeline import EventSource
 
 class ParametricSummarizer(EventSource):
-	
-	def __init__(self):
-		EventSource.__init__(self, ['parametricSummaryReady'])
-	
-	def parametricSummaryReady(self, dataSource): pass
-	
-	def getAllRows(self):
-		return self.summaryMap.iteritems()
-	
-	def before_begin(self, dataSource):
-		self.rawMap = dict()
-		self.summaryMap = None
-	
-	def before_complete(self, dataSource):
-		self.summaryMap = dict()
-		for key, values in self.rawMap.iteritems():
-			values.sort()
-			self.summaryMap[key] = SummaryStatistics(values)
-		self.parametricSummaryReady(dataSource)
-	
-	def before_send(self, dataSource, data):
-		table, row = data
-		if table.name == ptr.name:
-			self.onPtr(row)
-		elif table.name == mpr.name:
-			self.onMpr(row)
-	
-	def onPtr(self, row):
-		values = self.rawMap.setdefault((
-			row[ptr.SITE_NUM],row[ptr.TEST_NUM],0), [])
-		values.append(row[ptr.RESULT])
-	
-	def onMpr(self, row):
-		for i in xrange(row[mpr.RSLT_CNT]):
-			values = self.rawMap.setdefault((row[ptr.SITE_NUM],row[ptr.TEST_NUM],i), [])
-			values.append(row[mpr.RTN_RSLT][i])
-	
+    def __init__(self):
+        self.ptr = V4.Ptr()
+        self.mpr = V4.Mpr()
+        EventSource.__init__(self, ['parametricSummaryReady'])
+
+    def parametricSummaryReady(self, _):
+        print '---------- Parametric Summary ----------'
+        for k, v in self.summaryMap.items():
+            print k, v
+
+    def getAllRows(self):
+        return self.summaryMap.iteritems()
+
+    def before_begin(self, _):
+        self.rawMap = dict()
+        self.summaryMap = None
+
+    def before_complete(self, dataSource):
+        self.summaryMap = dict()
+        for key, values in self.rawMap.iteritems():
+            values.sort()
+            self.summaryMap[key] = SummaryStatistics(values)
+        self.parametricSummaryReady(dataSource)
+
+    def before_send(self, _, record):
+        if record.name == 'Ptr':
+            self.onPtr(record.values)
+        elif record.name == 'Mpr':
+            self.onMpr(record.values)
+
+    def onPtr(self, row):
+        values = self.rawMap.setdefault((row[self.ptr.SITE_NUM], row[self.ptr.TEST_NUM], 0), [])
+        values.append(row[self.ptr.RESULT])
+
+    def onMpr(self, row):
+        for i in xrange(row[self.mpr.RSLT_CNT]):
+            values = self.rawMap.setdefault((row[self.ptr.SITE_NUM], row[self.ptr.TEST_NUM], i), [])
+            values.append(row[self.mpr.RTN_RSLT][i])
+
+#*******************************************************************************************************************
+if __name__ == "__main__":
+    from Parse import process_file
+    import sys
+    fn = r'../data/lot3.stdf'
+    #fn = r'/path/to/log.stdf.gz'
+    filename, = sys.argv[1:] or (fn,)
+    ps = ParametricSummarizer()
+    process_file(filename, [ps], breakCount=20)

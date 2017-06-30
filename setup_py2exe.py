@@ -20,7 +20,7 @@
 
 import sys
 from distutils.core import setup
-import py2exe
+#import py2exe
 
 # If run without args, build executables, in quiet mode.
 if len(sys.argv) == 1:
@@ -30,7 +30,7 @@ if len(sys.argv) == 1:
 class Target:
     def __init__(self, **kw):
         self.__dict__.update(kw)
-        # for the versioninfo resources
+        # for the version info resources
         self.version = "1.3.1"
         self.company_name = "Casey Marshall"
         self.copyright = "Copyright (c) Casey Marshall 2006, All Rights Reserved"
@@ -106,7 +106,7 @@ PySTDF is released under a GPL license. Applications developed with PySTDF can o
     author='Casey Marshall',
     author_email='casey.marshall@gmail.com',
     url='http://code.google.com/p/pystdf/',
-    packages=['pystdf','pystdf.explorer'],
+    packages=['pystdf','pystdf.explorer', 'pyatdf'],
     scripts=['scripts/stdf_slice', 'scripts/rec_index', 'scripts/stdf2atdf'],
     classifiers=[
       'Development Status :: 4 - Beta',
