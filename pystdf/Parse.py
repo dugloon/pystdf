@@ -30,31 +30,32 @@ from Pipeline import DataSource
 import IO
 import Types
 
-
-# **********************************************************************************************
-# **********************************************************************************************
+#**********************************************************************************************
+#**********************************************************************************************
 class Parser(DataSource):
-    def __init__(self, inp=sys.stdin, lazy=False):
+
+    def __init__(self, inp=sys.stdin, lazy=False, verify=False):
         super(Parser, self).__init__(['header'])
         self.inp = inp
         self.lazy = lazy
-        self.endian = '@'
+        self.verify = verify
+        IO.detectEndian(self.inp)
 
-    # **********************************************************************************************
-    def header(self, data):
-        pass  # This is here so that sinks can intercept the header event
+    #**********************************************************************************************
+    def header(self, data):             # This is here so that sinks can intercept the header event
+        pass
 
-    # **********************************************************************************************
+    #**********************************************************************************************
     def parse_records(self, breakCount=0):
         recordCount = 1
         try:
             while recordCount:
-                header = IO.readHeader(self.endian, self.inp, V4.RecordRegistrar)
+                header = IO.readHeader(self.inp, V4.RecordRegistrar)
                 self.header(header)
                 if V4.RecordRegistrar.has_key((header.typ, header.sub)):
                     record = V4.RecordRegistrar[(header.typ, header.sub)](header=header, parser=self)
                     if not self.lazy:
-                        IO.decodeValues(record)
+                        IO.decodeValues(record, self.verify)
                     self.send(record)
                 else:
                     self.inp.read(header.len)
@@ -64,11 +65,10 @@ class Parser(DataSource):
         except Types.EofException:
             pass
 
-    # **********************************************************************************************
+    #**********************************************************************************************
     def parse(self, breakCount=0):
         self.begin()
         try:
-            self.endian = IO.detectEndian(self.inp)
             self.parse_records(breakCount)
             self.complete()
         except Exception, exception:
@@ -76,9 +76,8 @@ class Parser(DataSource):
             self.cancel(exception)
             raise
 
-
-# **********************************************************************************************
-# **********************************************************************************************
+#**********************************************************************************************
+#**********************************************************************************************
 class Reader(object):
     def __init__(self, fileName, mode="rb"):
         if fileName.endswith('.gz'):
@@ -87,21 +86,21 @@ class Reader(object):
             self.inp = bz2.BZ2File(fileName, mode)
         else:
             self.inp = open(fileName, mode)
-        self.endian = IO.detectEndian(self.inp)
+        IO.detectEndian(self.inp)
 
-    # **********************************************************************************************
+    #**********************************************************************************************
     def __iter__(self):
         return self
 
-    # **********************************************************************************************
+    #**********************************************************************************************
     def __del__(self):
         if self.inp:
             self.inp.close()
-
-    # **********************************************************************************************
+        
+    #**********************************************************************************************
     def next(self):
         try:
-            header = IO.readHeader(self.endian, self.inp, V4.RecordRegistrar)
+            header = IO.readHeader(self.inp, V4.RecordRegistrar)
             key = (header.typ, header.sub)
             if V4.RecordRegistrar.has_key(key):
                 record = V4.RecordRegistrar[key](header=header, parser=self)
@@ -114,18 +113,16 @@ class Reader(object):
             self.inp = None
             raise StopIteration
 
-
-# **********************************************************************************************
-# **********************************************************************************************
+#**********************************************************************************************
+#**********************************************************************************************
 def runDocTests():
     import doctest
-    with open(r'../data/demofile.stdf') as fin:
+    with open(r'C:\Users\dlooney\dev\pystdf-master\data\AP0100A_506556_P0UM44_P0UM44-12A4_20140627163341.stdf') as fin:
         pObj = Parser(inp=fin)
         doctest.testmod(extraglobs={'pObj': pObj})
 
-
-# *******************************************************************************************************************
-def process_file(filename, writers, breakCount=0, lazy=False):
+#*******************************************************************************************************************
+def process_file(filename, writers, breakCount=0, lazy=False, verify=False):
     gzPattern = re.compile('\.g?z', re.I)
     bz2Pattern = re.compile('\.bz2', re.I)
     if filename is None:
@@ -138,14 +135,13 @@ def process_file(filename, writers, breakCount=0, lazy=False):
         f = reopen_fn()
     else:
         f = open(filename, 'rb')
-    p = Parser(inp=f, lazy=lazy)
+    p = Parser(inp=f, lazy=lazy, verify=verify)
     for writer in writers:
         p.addSink(writer)
     p.parse(breakCount=breakCount)
     f.close()
 
-
-# *******************************************************************************************************************
+#*******************************************************************************************************************
 if __name__ == "__main__":
     fn = r'../data/demofile.stdf'
     # process_file(fn, [])

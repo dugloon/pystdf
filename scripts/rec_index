@@ -19,7 +19,7 @@
 #
 
 from __future__ import print_function
-import sys, os, re
+import sys, re
 
 try:
     import gzip
@@ -32,9 +32,8 @@ try:
 except ImportError:
     have_bz2 = False
 
-from pystdf.IO import Parser
+from pystdf.Parse import Parser
 from pystdf.Indexing import RecordIndexer
-import pystdf.V4
 
 #def info(type, value, tb):
 #    import traceback, pdb

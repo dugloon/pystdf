@@ -27,6 +27,7 @@ from Parse import process_file
 #*******************************************************************************************************************
 def dpatLimits(passingValues, lowerThreshold, upperThreshold):
     '''
+    http://ams/productEng/processors/Shared Documents/AEC Documents/AEC_Q001_Rev_D.pdf
     '''
     passingValues.sort()
     length = len(passingValues)

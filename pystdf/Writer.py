@@ -35,15 +35,16 @@ class AtdfWriter(object):
 
     @staticmethod
     def format(record, field):
-        if field.value is None:
+        value = record.values[field.index]
+        if value is None:
             return ''
         if field.arrayFmt: # An Array of some other type
-            return ','.join([AtdfWriter.format_by_type(v, field.arrayFmt) for v in field.value])
+            return ','.join([AtdfWriter.format_by_type(v, field.arrayFmt) for v in value])
         if record.name in ('Mir', 'Mrr'):
             if field.name.endswith('_T'): # A Date-Time in an MIR/MRR
-                return strftime('%H:%M:%S %d-%b-%Y', localtime(field.value))
-            return str(field.value)
-        return str(field.value)
+                return strftime('%H:%M:%S %d-%b-%Y', localtime(value))
+            return str(value)
+        return str(value)
 
     def __init__(self, stream=sys.stdout):
         self.stream = stream
@@ -68,14 +69,14 @@ class StdfWriter(object):
         self.stream = stream
 
     # =============================================================================================
-    def writeRecord(self, dataSource, record):
-        encodedValues = IO.encodeRecord(dataSource.endian, record)
-        packedRecord = IO.packRecord(dataSource.endian, record, encodedValues)
+    def writeRecord(self, record):
+        encodedValues = IO.encodeRecord(record)
+        packedRecord = IO.packRecord(record, encodedValues)
         self.stream.write(packedRecord)
 
     # =============================================================================================
     def after_send(self, dataSource, record):
-        self.writeRecord(dataSource, record)
+        self.writeRecord(record)
 
     # =============================================================================================
     def after_complete(self, _):
@@ -91,8 +92,8 @@ class StdfModifier(StdfWriter):
         Adding the version 2007 marker and an Audit Trail Record
         """
         if record.name == 'Mir':
-            self.writeRecord(dataSource, V4.Atr(MOD_TIM=time(), CMD_LINE='pack'))
-            self.writeRecord(dataSource, V4.Vur(UPD_CNT=1, UPD_NAM=['Scan:2007.1']))
+            self.writeRecord(V4.Atr(MOD_TIM=time(), CMD_LINE='pack'))
+            self.writeRecord(V4.Vur(UPD_CNT=1, UPD_NAM=['Scan:2007.1']))
         super(StdfModifier, self).after_send(dataSource, record)
 
 #*******************************************************************************************************************
@@ -101,16 +102,19 @@ class StdfVerify(object):
     """
     @staticmethod
     # =============================================================================================
-    def after_send(dataSource, record):
-        processedData = IO.encodeRecord(dataSource.endian, record)
+    def after_send(_, record):
+        processedData = IO.encodeRecord(record)
         for field in record.fields():
             record.verify(field.name, field.format, processedData[field.index])
 
 #*******************************************************************************************************************
 if __name__ == "__main__":
     fn = r'../data/tfile.std'
-    aObj = AtdfWriter()
-    vObj = StdfVerify()
-    wObj = StdfModifier() #StdfWriter()
-    Parse.process_file(fn, [wObj], lazy=True)
-    Parse.process_file(fn, [vObj])
+    obj = StdfVerify()
+    Parse.process_file(fn, [obj], verify=True)
+    obj = AtdfWriter()
+    Parse.process_file(fn, [obj])
+    obj = StdfModifier()
+    Parse.process_file(fn, [obj])
+    obj = StdfWriter()
+    Parse.process_file(fn, [obj])

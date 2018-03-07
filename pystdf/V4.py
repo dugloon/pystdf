@@ -6,12 +6,12 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-#
+# 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
+# 
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -145,6 +145,23 @@ def registerMe(cls):
     Decorator places each record class into the registrar by name and (type, subtype)
     """
     cls.name = cls.__name__
+    cls._fields = [None] * len(cls.fieldMap)
+    for ndx, fld in enumerate(cls.fieldMap):
+        setattr(cls, fld[0], ndx)
+        arrayFmt, arrayNdx, itemNdx  = None, None, None
+        name, fmt, missing = fld[:3]
+        if fmt[0] == 'k':
+            arrayNdx, arrayFmt = cls.arrayMatch.match(fmt).groups()
+            arrayNdx = int(arrayNdx)
+        if name in cls.sizeMap:
+            itemNdx = cls.sizeMap[name]
+        cls._fields[ndx] = RecordType.Field(name=name,
+                                format=fmt,
+                                missing=missing,
+                                index=ndx,
+                                arrayFmt=arrayFmt,
+                                arrayNdx=arrayNdx,
+                                itemNdx=itemNdx)
     RecordRegistrar[cls.name] = RecordRegistrar[(cls.typ, cls.sub)] = cls
     return cls
 
@@ -1814,6 +1831,7 @@ class Tsr(RecordType):
         ('TST_SUMS', 'R4', ('OPT_FLAG', B4)),
         ('TST_SQRS', 'R4', ('OPT_FLAG', B5))
         )
+        
 @registerMe
 class Ptr(RecordType):
     """

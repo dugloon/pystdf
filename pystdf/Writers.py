@@ -22,54 +22,28 @@ import threading
 import sys, re
 from time import strftime, localtime
 from xml.sax.saxutils import quoteattr
+import Parse
 
 def format_by_type(value, field_type):
     if field_type in ('B1', 'N1'):
         return '%02X' % value
     return str(value)
 
-class AtdfWriter:
-    @staticmethod
-    def atdf_format(rectype, field):
-        if field.value is None:
-            return ""
-        if rectype.name == "Gdr":
-            return '|'.join([str(v) for v in field.value])
-        if field.arrayFmt: # An Array of some other type
-            return ','.join([format_by_type(v, field.arrayFmt) for v in field.value])
-        if rectype.name in ['Mir', 'Mrr']:
-            if field.name.endswith('_T'): # A Date-Time in an MIR/MRR
-                return strftime('%H:%M:%S %d-%b-%Y', localtime(field.value))
-            return str(field.value)
-        return str(field.value)
-
-    def __init__(self, stream=sys.stdout):
-        self.stream = stream
-
-    def after_send(self, _, record):
-        line = '%s:%s%s' % (record.name, '|'.join([self.atdf_format(record, field) for field in record.fields()]), '\n')
-        self.stream.write(line)
-
-    def after_complete(self, _):
-        self.stream.flush()
-
-
 class XmlWriter:
     extra_entities = {'\0': ''}
 
     @staticmethod
     def xml_format(rectype, field):
-        if field.value is None:
+        value = rectype.values[field.index]
+        if value is None:
             return ""
-        if rectype.name == 'Gdr':
-            return ';'.join([str(v) for v in field.value])
         if field.arrayFmt: # An Array of some other type
-            return ','.join([format_by_type(v, field.arrayFmt) for v in field.value])
+            return ','.join([format_by_type(v, field.arrayFmt) for v in value])
         if rectype.name in ['Mir', 'Mrr']:
             if field.name.endswith('_T'): # A Date-Time in an MIR/MRR
-                return strftime('%H:%M:%ST%d-%b-%Y', localtime(field.value))
-            return str(field.value)
-        return str(field.value)
+                return strftime('%H:%M:%ST%d-%b-%Y', localtime(value))
+            return str(value)
+        return str(value)
 
     def __init__(self, stream=sys.stdout):
         self.stream = stream
@@ -105,21 +79,21 @@ class JsonWriter:
 
     @staticmethod
     def json_format(rectype, field):
-        if field.value is None:
+        value = rectype.values[field.index]
+        if value is None:
             return '""'
-        if rectype.name == 'Gdr' or field.arrayFmt: # An Array of some other type
-            if not len(field.value):
+        if field.arrayFmt: # An Array of some other type
+            if not len(value):
                 return '[]'
-            return '[%s]' % ','.join([json_by_type(v, field.format[:2]) for v in field.value])
+            return '[%s]' % ','.join([json_by_type(v, field.format[:2]) for v in value])
         if rectype.name in ['Mir', 'Mrr']:
             if field.name.endswith('_T'): # A Date-Time in an MIR/MRR
-                return strftime('"%Y-%m-%d %H:%M:%S"', localtime(field.value))
-            return json_by_type(field.value, field.format[:2])
-        return json_by_type(field.value, field.format[:2])
+                return strftime('"%Y-%m-%d %H:%M:%S"', localtime(value))
+            return json_by_type(value, field.format[:2])
+        return json_by_type(value, field.format[:2])
 
-    def __init__(self, stream=None):
-        self.stream = stream or sys.stdout
-        self.sep = ''
+    def __init__(self, stream=sys.stdout):
+        self.stream = stream
 
     def before_begin(self, dataSource):
         self.stream.write('{"data":[\n')
@@ -168,3 +142,12 @@ class JsonStreamer(JsonWriter):
         with self._lock:
             JsonWriter.after_complete(self, dataSource)
         self._done = True
+
+
+#*******************************************************************************************************************
+if __name__ == "__main__":
+    fn = r'../data/tfile.std'
+    obj = JsonWriter()
+    Parse.process_file(fn, [obj])
+    obj = XmlWriter()
+    Parse.process_file(fn, [obj])

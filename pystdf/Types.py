@@ -18,12 +18,11 @@
 #
 
 from binascii import hexlify
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 import re
 
-
-# **************************************************************************************************
-# **************************************************************************************************
+#**************************************************************************************************
+#**************************************************************************************************
 class RecordHeader:
     def __init__(self, length, typ, sub, recordMap=None):
         self.len = length
@@ -31,123 +30,114 @@ class RecordHeader:
         self.sub = sub
         cls = recordMap.get((self.typ, self.sub))
         self.name = 'Unknown' if not cls else cls.name
-    
-    # ==============================================================================================
+
+    #==============================================================================================
     def __repr__(self):
         return "<STDF Header, NAME=%s REC_LEN=%d>" % (self.name, self.len)
 
-
-# **************************************************************************************************
-# **************************************************************************************************
+#**************************************************************************************************
+#**************************************************************************************************
 class RecordType(object):
-    name, typ, sub, fieldMap, sizeMap = '', None, None, (), {}
+    name, typ, sub, fieldMap, sizeMap, _fields = '', None, None, (), {}, []
     arrayMatch = re.compile('k(\d+)([A-Z][a-z0-9]+)')
-    Field = namedtuple('Field', 'name format missing index value arrayFmt arrayNdx arrayCnt itemNdx itemSiz')
+    Field = namedtuple('Field', 'name format missing index arrayFmt arrayNdx itemNdx')
     
-    # ==============================================================================================
+    #==============================================================================================
     def __init__(self, header=None, parser=None, **kwargs):
         self.parser = parser
         self.header = header
-        self.length = 0
         self.buffer = ''
-        self.values = list()
         if header and parser:
-            self.offset = parser.inp.tell()
             self.buffer = parser.inp.read(header.len)
             if self.buffer is None or len(self.buffer) != header.len:
                 raise EofException()
-        self.original = defaultdict(str)
-        self.setFieldMap(**kwargs)
+        self.original = dict()
+        self.values = [None] * len(self.fieldMap)
+        if kwargs:
+            self.setValues(**kwargs)
     
-    # ==============================================================================================
-    def setFieldMap(self, fieldMap=None, **kwargs):
-        if fieldMap:
-            self.fieldMap = fieldMap
-        self.values = list()
+    #==============================================================================================
+    def setFieldMap(self, fieldMap):
+        """
+        Used to dynamically update a field map spec for Generic Data Records (they can be anything)
+        """
+        self.fieldMap = fieldMap
+        self.values = [None] * len(fieldMap)
+        self._fields = [None] * len(fieldMap)
         for ndx, fld in enumerate(self.fieldMap):
             setattr(self, fld[0], ndx)
-            self.values.append(kwargs.get(fld[0]))
+            arrayFmt, arrayNdx, itemNdx  = None, None, None
+            name, fmt, missing = fld[:3]
+            if fmt[0] == 'k':
+                arrayNdx, arrayFmt = RecordType.arrayMatch.match(fmt).groups()
+                arrayNdx = int(arrayNdx)
+            if name in RecordType.sizeMap:
+                itemNdx = RecordType.sizeMap[name]
+            self._fields[ndx] = RecordType.Field(name=name,
+                                    format=fmt,
+                                    missing=missing,
+                                    index=ndx,
+                                    arrayFmt=arrayFmt,
+                                    arrayNdx=arrayNdx,
+                                    itemNdx=itemNdx)
     
-    # ==============================================================================================
+    #==============================================================================================
+    def setValues(self, **kwargs):
+        """
+        """
+        for fld, val in kwargs.items():
+            ndx = getattr(self, fld)
+            self.values[ndx] = val
+
+    #==============================================================================================
     def update(self, **kwargs):
         for name, value in kwargs:
             self.values[getattr(self, name)] = value
-    
-    # ==============================================================================================
+
+    #==============================================================================================
     def valuesMap(self):
         vd = dict()
         for ndx, fld in enumerate(self.fieldMap):
             vd[fld[0]] = self.values[ndx]
         return vd
-    
-    # ==============================================================================================
+
+    #==============================================================================================
     def __str__(self):
         s = "%s " % self.name
         s += str([fld[:2] for fld in self.fieldMap])
         return s
-    
-    # ==============================================================================================
+
+    #==============================================================================================
     def __repr__(self):
         s = "%s: (%02d, %02d)" % (self.name, self.typ, self.sub)
         for field in self.fields():
             s += "\n    %s" % repr(field)
         return s
-    
-    # ==============================================================================================
-    def checkReadLength(self, size):
-        if self.length + size > self.header.len:
-            raise EndOfRecordException()
-        return size
-    
-    # ==============================================================================================
+
+    #==============================================================================================
     def verify(self, name, fmt, data):
-        offset = 4 if fmt == 'Dn' else 0  # use slice to skip the bit count since we round on the way out
-        if data[offset:] != self.original[name][offset:]:
-            msg = '\nField %s (%s)\n    original : %s\n    processed: %s\n\n' % (
-            name, fmt, hexlify(self.original[name]), hexlify(data))
-            raise MismatchException(msg + repr(self))
-    
-    # ==============================================================================================
-    def bufferFromOffset(self, name, size):
-        buf = self.buffer[self.length:self.length + size]
-        if not buf or len(buf) != size:
-            raise EndOfRecordException()
-        self.original[name] += buf  # hold onto the original packed data for verification
-        self.length += size
-        return buf
-    
-    # ==============================================================================================
+        offset = 2 if fmt == 'Dn' else 0  # use slice to skip the bit count since we round on the way out
+        bufset, size = self.original[name]
+        original = self.buffer[bufset+offset:bufset+size]
+        processed = data[offset:]
+        if original != processed:
+            msg = '\nField %s (%s)\n    original : %s\n    processed: %s\n\n' % (name, fmt, hexlify(original), hexlify(processed))
+            raise MismatchException(msg+repr(self))
+
+    #==============================================================================================
     def field(self, nameOrIndex):
-        arrayFmt, arrayNdx, arrayCnt, itemNdx, itemSiz = None, None, None, None, None
-        ndx = getattr(self, nameOrIndex) if hasattr(nameOrIndex, 'upper') else nameOrIndex
-        name, fmt, missing = self.fieldMap[ndx][:3]
-        if fmt[0] == 'k':
-            arrayNdx, arrayFmt = self.arrayMatch.match(fmt).groups()
-            arrayNdx = int(arrayNdx)
-            arrayCnt = self.values[arrayNdx]
-        if name in self.sizeMap:
-            itemNdx = self.sizeMap[name]
-            itemSiz = self.values[getattr(self, itemNdx)]
-        return RecordType.Field(name=name,
-                                format=fmt,
-                                missing=missing,
-                                index=ndx,
-                                value=self.values[ndx],
-                                arrayFmt=arrayFmt,
-                                arrayNdx=arrayNdx,
-                                arrayCnt=arrayCnt,
-                                itemNdx=itemNdx,
-                                itemSiz=itemSiz)
+        try:
+            return self._fields[nameOrIndex]
+        except:
+            nameOrIndex = getattr(self, nameOrIndex)
+            return self._fields[nameOrIndex]
     
-    # ==============================================================================================
+    #==============================================================================================
     def fields(self):
-        for ndx, fld in enumerate(self.fieldMap):
-            yield self.field(ndx)
-        raise StopIteration
+        return self._fields
 
-
-# **************************************************************************************************
-# **************************************************************************************************
+#**************************************************************************************************
+#**************************************************************************************************
 class UnknownRecord(RecordType):
     def __init__(self, typ, sub):
         super(UnknownRecord, self).__init__()
@@ -155,16 +145,12 @@ class UnknownRecord(RecordType):
         self.sub = sub
         self.name = 'UnknownRecord'
 
-
-# **************************************************************************************************
-# **************************************************************************************************
+#**************************************************************************************************
+#**************************************************************************************************
 class EofException(Exception): pass
-
 
 class EndOfRecordException(Exception): pass
 
-
 class InitialSequenceException(Exception): pass
-
 
 class MismatchException(Exception): pass
