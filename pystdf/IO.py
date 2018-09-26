@@ -477,7 +477,7 @@ def encodeMissingField(record, name, fmt, missing, index, arrayFmt, processedDat
         record.values[flagField.index] |= (flagField.missing ^ mask)
         processedData[flagField.index] = val = packMap[flagField.format](record.values[flagField.index], flagField.format)
     else:
-        record.values[index] = val = missing
+        record.values[index] = val = str(missing)
     return val
 
 # **********************************************************************************************
