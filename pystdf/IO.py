@@ -19,6 +19,8 @@
 
 from struct import calcsize, unpack_from, unpack, Struct, pack, error
 import Types
+import types
+import ujson
 
 _endian = '@'
 _unpackHeader = Struct('@HBB').unpack
@@ -212,7 +214,7 @@ def readVn(record, verify):
         _, genData, offset = fieldReader(buf, offset, fmt)
         if fmt == 'B0':
             continue
-        vName = '%s_%d' % (GEN_DATA_, i)
+        vName = '%s%d' % (GEN_DATA_, i)
         if verify:
             record.original[vName] = (rln, offset-rln)
         fm[i+1] = (vName, fmt, None)
@@ -274,6 +276,7 @@ def readNibbleArray(buf, offset, arrayCnt, arrayFmt):
 
 #**********************************************************************************************
 def decodeValues(record, verify=False):
+    name = None
     try:
         oft, mxLen, buf, vals, orig = 0, len(record.buffer), record.buffer, record.values, record.original
         for name, fmt, missing, index, arrayFmt, arrayNdx, itemNdx in record.fields():
@@ -305,13 +308,33 @@ def decodeValues(record, verify=False):
         pass
     except error, err:
         print err
-        print record
+        print name, record
     except:
+        print name, record
         raise
 
 #**********************************************************************************************
 #**********************************************************************************************
 #**********************************************************************************************
+#**********************************************************************************************
+gdrMap = {
+    types.StringType: ('Cn', str),
+    types.UnicodeType: ('Cn', str),
+    types.FloatType: ('R8', float),
+    types.IntType: ('I4', int),
+    types.LongType: ('I4', int),
+    types.ListType: ('Dn', tuple),
+    types.TupleType: ('Dn', tuple)
+}
+
+def encodeGdr(stringData):
+    try:
+        data = ujson.loads(stringData.replace('(', '[').replace(')', ']'))
+    except:
+        return 'Cn', str(stringData)
+    fmt, cst = gdrMap.get(type(data), ('Cn', str))
+    return fmt, cst(stringData)
+    
 #**********************************************************************************************
 def packRecord(record, encodedValues):
     packedValues = ''.join(encodedValues)
@@ -344,7 +367,7 @@ def packCn(value):
     """
     try:
         siz = len(value)
-        return pack('B%ds' % siz, siz, value)
+        return pack('B%ds' % siz, siz, value[:255])
     except Exception, err:
         raise Types.EndOfRecordException('%s' % err)
 
@@ -473,11 +496,14 @@ def encodeMissingField(record, name, fmt, missing, index, arrayFmt, processedDat
     if isinstance(missing, tuple):
         flagField, mask = missing
         flagField = record.field(flagField)
-        record.values[index] = [] if arrayFmt else defaultDataMap[fmt]
+        if arrayFmt:
+            record.values[index] = val = []
+        else:
+            record.values[index] = val = packMap[fmt](defaultDataMap[fmt], fmt)
         record.values[flagField.index] |= (flagField.missing ^ mask)
-        processedData[flagField.index] = val = packMap[flagField.format](record.values[flagField.index], flagField.format)
+        processedData[flagField.index] = packMap[flagField.format](record.values[flagField.index], flagField.format)
     else:
-        record.values[index] = val = str(missing)
+        record.values[index] = val = packMap[fmt](missing, fmt)
     return val
 
 # **********************************************************************************************
@@ -512,11 +538,11 @@ def encodeRecord(record):
                 encodeArrayField(record, index, arrayFmt, arrayNdx, itemNdx, processedData)
                 continue
             if name.startswith(GEN_DATA_):
-                processedData[index] = packVn(val, fmt)
+                processedData[index] = packVn(val, fmt) # Gdr constructor prefixes the data with the count of fields
                 continue
-            if fmt == 'Cn':
+            if fmt == 'Cn':                 # inline of packCn
                 siz = len(val)
-                processedData[index] = pack('B%ds' % siz, siz, val)
+                processedData[index] = pack('B%ds' % siz, siz, str(val[:255]))
             elif fmt[-1] in 'nf':
                 processedData[index] = packMap[fmt](val, fmt)
             else:

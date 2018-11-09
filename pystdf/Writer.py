@@ -75,6 +75,13 @@ class StdfWriter(object):
         self.stream.write(packedRecord)
 
     # =============================================================================================
+    def writeRecords(self, records):
+        packedRecords = ''
+        for record in records:
+            packedRecords += IO.packRecord(record, IO.encodeRecord(record))
+        self.stream.write(packedRecords)
+
+    # =============================================================================================
     def after_send(self, dataSource, record):
         self.writeRecord(record)
 

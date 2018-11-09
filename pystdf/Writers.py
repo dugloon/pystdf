@@ -22,6 +22,7 @@ import threading
 import sys, re
 from time import strftime, localtime
 from xml.sax.saxutils import quoteattr
+from ujson import dumps
 import Parse
 
 def format_by_type(value, field_type):
@@ -63,15 +64,21 @@ class XmlWriter:
         self.stream.flush()
 
 def json_by_type(value, field_type):
-    if field_type in ('B1', 'N1'):
-        return '"0x%02X"' % value
-    if field_type == 'C1':
-        return '"%s"' % value if 31 < ord(value) < 127 else '" "'
-    if field_type == 'Cn':
-        return '"%s"' % value
-    if field_type in ('Bn', 'Dn', 'Vn'):
-        return str(value) if unicode(value).isnumeric() else '"%s"' % value
-    return str(value)
+    try:
+        if field_type in ('B1', 'N1'):
+            return '"0x%02X"' % value
+        if field_type == 'C1':
+            return '"%s"' % value if 31 < ord(value) < 127 else '"0x%02X"' % value
+        if field_type == 'Cn':
+            value = value.replace('\n', ' ')
+            return '"%s"' % value
+        if field_type in ('Bn', 'Dn', 'Vn'):
+            return str(value) if unicode(value).isnumeric() else '"%s"' % str(value)
+        return dumps(value)
+    except OverflowError:
+        return '"%s"' % str(value)
+    except:
+        return dumps(value)
 
 class JsonWriter:
     _ws = re.compile(r'[\t\f\v]')
@@ -92,14 +99,20 @@ class JsonWriter:
             return json_by_type(value, field.format[:2])
         return json_by_type(value, field.format[:2])
 
-    def __init__(self, stream=sys.stdout):
+    def __init__(self, stream=sys.stdout, link=None):
         self.stream = stream
+        self.link = link
 
     def before_begin(self, dataSource):
-        self.stream.write('{"data":[\n')
+        if self.link:
+            self.stream.write('{"link":"%s","data":[' % self.link)
+        else:
+            self.stream.write('{"data":[')
         self.sep = ''
 
     def after_send(self, dataSource, record):
+        if dataSource.lazy and record.name not in dataSource.lazy:
+            return
         line = '%s{"k":"%s", "v":[%s]}\n' % (self.sep, record.name,
                             ','.join([self.json_format(record, field) for field in record.fields()]))
         self.sep = ','
@@ -148,6 +161,6 @@ class JsonStreamer(JsonWriter):
 if __name__ == "__main__":
     fn = r'../data/tfile.std'
     obj = JsonWriter()
-    Parse.process_file(fn, [obj])
-    obj = XmlWriter()
-    Parse.process_file(fn, [obj])
+    Parse.process_file(fn, [obj], lazy=Parse.summaryRecords)
+    #obj = XmlWriter()
+    #Parse.process_file(fn, [obj])

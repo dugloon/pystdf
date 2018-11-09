@@ -41,7 +41,7 @@ Major  Minor  2007 Record  Type
    01     91  new  NMR     Name Map Record
    01     92  new  CNR     Cell Name Record
    01     93  new  SSR     Scan Structure Record
-   01     94  new  SCR     Scan Chain Record
+   01     94  new  CDR     Chain Description Record
 ------------------------------------------------------------- Per Wafer
    02     10       WIR     Wafer Information Record
    02     20       WRR     Wafer Results Record
@@ -127,6 +127,7 @@ kxTYPE      Array of data of the type specified.                 TYPE[]
 """
 
 from Types import RecordType, UnknownRecord
+from IO import encodeGdr, GEN_DATA_
 
 B7, B6, B5, B4, B3, B2, B1, B0, BN = 0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe, 0xff
 
@@ -337,9 +338,9 @@ class Mir(RecordType):
       OPER_NAM C*n  Operator name or ID (at setup time)       length byte = 0
       EXEC_TYP C*n  Tester executive software type            length byte = 0
       EXEC_VER C*n  Tester exec software version number       length byte = 0
-      TEST_COD C*n  Test phaseorstepcode                      length byte = 0
+      TEST_COD C*n  Test phase or step code                   length byte = 0
       TST_TEMP C*n  Test temperature                          length byte = 0
-      USER_TXT C*n  Genericusertext                           length byte = 0
+      USER_TXT C*n  Generic user text                         length byte = 0
       AUX_FILE C*n  Name of auxiliary data file               length byte = 0
       PKG_TYP  C*n  Package type                              length byte = 0
       FAMLY_ID C*n  Product family ID                         length byte = 0
@@ -1045,7 +1046,7 @@ class Sdr(RecordType):
 @registerMe
 class Psr(RecordType):
     """
-    **Pattern Sequence Record (SDR)**
+    **Pattern Sequence Record (PSR)**
 
     Function:
       PSR record contains the information on the pattern profile for a specific
@@ -1241,7 +1242,7 @@ class Cnr(RecordType):
 @registerMe
 class Ssr(RecordType):
     """
-    **Scan Structure Record (CNR)**
+    **Scan Structure Record (SSR)**
 
     Function:
         This record contains the Scan Structure information normally found in a STIL
@@ -1276,7 +1277,7 @@ class Ssr(RecordType):
 @registerMe
 class Cdr(RecordType):
     """
-    **Chain Description Record (CNR)**
+    **Chain Description Record (CDR)**
 
     Function:
         This record contains the description of a scan chain in terms of its input,
@@ -1370,7 +1371,7 @@ class Wir(RecordType):
 
     Notes on Specific Fields:
       SITE_GRP:
-        Refers to the site group in the SDR .Thisisa meansof relating the wafer
+        Refers to the site group in the SDR. This is a means of relating the wafer
         information to the configuration of the equipment used to test it. If
         this information is not known, or the tester does not support the
         concept of site groups, this field should be set to 255.
@@ -1382,8 +1383,7 @@ class Wir(RecordType):
       One per wafer tested.
 
     Location:
-      Anywhere in the data stream after the initial sequence and before the
-      MRR.
+      Anywhere in the data stream after the initial sequence and before the MRR.
       Sent before testing each wafer.
 
     Possible Use:
@@ -1771,9 +1771,8 @@ class Tsr(RecordType):
         this field must be set to 255.
       TEST_TYP:
         Indicates what type of test this summary data is for. Valid values are:
-
-          * P = Parametrictest
-          * F = Functionaltest
+          * P = Parametric test
+          * F = Functional test
           * M = Multiple-result parametric test
           * space = Unknown
     EXEC_CNT,FAIL_CNT, ALRM_CNT:
@@ -1781,7 +1780,6 @@ class Tsr(RecordType):
       compute, values for complete final summary sheets.
     OPT_FLAG:
       Contains the following fields:
-
         * bit 0 set = TEST_MIN value is invalid
         * bit 1 set = TEST_MAX value is invalid
         * bit 2 set = TEST_TIM value is invalid
@@ -1789,8 +1787,8 @@ class Tsr(RecordType):
         * bit 4 set = TST_SUMS value is invalid
         * bit 5 set = TST_SQRS value is invalid
         * bits 6 - 7 are reserved for future use and must be 1
-
       OPT_FLAG is optional if it is the last field in the record.
+
     TST_SUMS, TST_SQRS:
       Are useful incalculating the mean and standard deviationfor a single lot or
       when combining test data from multiple STDF files.
@@ -2894,7 +2892,7 @@ class Gdr(RecordType):
       REC_SUB  U*1   Record sub-type (20)
       FLD_CNT  U*2   Count of data fields in record
       GEN_DATA V*n   Data type code and data for one field
-                     (Repeat GEN_DATA foreach datafield)
+                     (Repeat GEN_DATA foreach data field)
       ======== ===== ======================================== ====================
 
     Notes on Specific Fields:
@@ -2950,7 +2948,7 @@ class Gdr(RecordType):
                   contains two bytes, so the next field also begins on an
                   even byte.
         510  5    A two-byte numeric value must begin on an even byte. This
-                  GEN_DATA field would begin on an even byte and,because
+                  GEN_DATA field would begin on an even byte and, because
                   the first byte is the data code, the actual numeric value
                   would begin on an odd byte. This field must therefore be
                   preceded by a pad byte.
@@ -2970,7 +2968,7 @@ class Gdr(RecordType):
         0a        02       Character string: code (10) and length (2)
         41        42       Character string: data bytes (*A* and *B*)
         01        ff       1-byte integer: code (1) and data (255 = 0xff)
-        00        05       Padbyte(0); code(5) fornextfield
+        00        05       Pad byte(0); code(5) for next field
         fe        01       2-byte signed integer (510 = 0x01fe)
         ========= ======== ==============================================
 
@@ -2988,6 +2986,23 @@ class Gdr(RecordType):
     fieldMap = (
         ('GEN_DATA', 'Vn', None),
         )
+
+    #==============================================================================================
+    def __init__(self, header=None, parser=None, values=None, **kwargs):
+        super(Gdr, self).__init__(header=header, parser=parser, **kwargs)
+        if not values:
+            return
+        vln = len(values)
+        fm = [None] * (vln+1)
+        fm[0] =('FLD_CNT', 'U2', None)
+        vn = [vln] * (vln+1)
+        for i in range(vln):
+            fmt, val = encodeGdr(values[i])
+            vName = '%s%d' % (GEN_DATA_, i)
+            fm[i+1] = (vName, fmt, None)
+            vn[i+1] = val
+        self.setFieldMap(fm)            # replace the field map dynamically
+        self.values = vn
 
 @registerMe
 class Dtr(RecordType):

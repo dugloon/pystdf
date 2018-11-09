@@ -30,11 +30,37 @@ from Pipeline import DataSource
 import IO
 import Types
 
+summaryRecords = [
+    'Far',
+    'Atr',
+    'Vur',
+    'Mir',
+    'Mrr',
+    'Pcr',
+    'Hbr',
+    'Sbr',
+    'Pmr',
+    'Pgr',
+    'Plr',
+    'Rdr',
+    'Sdr',
+    'Psr',
+    'Nmr',
+    'Cnr',
+    'Ssr',
+    'Scr',
+    'Wir',
+    'Wrr',
+    'Wcr',
+    'Prr',
+    'Tsr',
+]
+
 #**********************************************************************************************
 #**********************************************************************************************
 class Parser(DataSource):
 
-    def __init__(self, inp=sys.stdin, lazy=False, verify=False):
+    def __init__(self, inp=sys.stdin, lazy=None, verify=False):
         super(Parser, self).__init__(['header'])
         self.inp = inp
         self.lazy = lazy
@@ -54,7 +80,7 @@ class Parser(DataSource):
                 self.header(header)
                 if V4.RecordRegistrar.has_key((header.typ, header.sub)):
                     record = V4.RecordRegistrar[(header.typ, header.sub)](header=header, parser=self)
-                    if not self.lazy:
+                    if not self.lazy or record.name in self.lazy:
                         IO.decodeValues(record, self.verify)
                     self.send(record)
                 else:
@@ -79,13 +105,14 @@ class Parser(DataSource):
 #**********************************************************************************************
 #**********************************************************************************************
 class Reader(object):
-    def __init__(self, fileName, mode="rb"):
+    def __init__(self, fileName, mode="rb", lazy=None):
         if fileName.endswith('.gz'):
             self.inp = gzip.open(fileName, mode)
         elif fileName.endswith('.bz'):
             self.inp = bz2.BZ2File(fileName, mode)
         else:
             self.inp = open(fileName, mode)
+        self.lazy = lazy
         IO.detectEndian(self.inp)
 
     #**********************************************************************************************
@@ -104,7 +131,8 @@ class Reader(object):
             key = (header.typ, header.sub)
             if V4.RecordRegistrar.has_key(key):
                 record = V4.RecordRegistrar[key](header=header, parser=self)
-                IO.decodeValues(record)
+                if not self.lazy or record.name in self.lazy:
+                    IO.decodeValues(record)
                 return record
             else:
                 raise KeyError("Unknown type (%s): Len (%d)" % (key, header.len))
@@ -122,7 +150,7 @@ def runDocTests():
         doctest.testmod(extraglobs={'pObj': pObj})
 
 #*******************************************************************************************************************
-def process_file(filename, writers, breakCount=0, lazy=False, verify=False):
+def process_file(filename, writers, breakCount=0, lazy=None, verify=False):
     gzPattern = re.compile('\.g?z', re.I)
     bz2Pattern = re.compile('\.bz2', re.I)
     if filename is None:
