@@ -23,7 +23,8 @@ import re
 
 #**************************************************************************************************
 #**************************************************************************************************
-class RecordHeader:
+class RecordHeader(object):
+    __slots__ = ['len', 'typ', 'sub', 'name']
     def __init__(self, length, typ, sub, recordMap=None):
         self.len = length
         self.typ = typ
@@ -41,7 +42,7 @@ class RecordType(object):
     name, typ, sub, fieldMap, sizeMap, _fields = '', None, None, (), {}, []
     arrayMatch = re.compile('k(\d+)([A-Z][a-z0-9]+)')
     Field = namedtuple('Field', 'name format missing index arrayFmt arrayNdx itemNdx')
-    
+    __slots__ = ['parser', 'header', 'buffer', 'original', 'values']
     #==============================================================================================
     def __init__(self, header=None, parser=None, **kwargs):
         self.parser = parser
